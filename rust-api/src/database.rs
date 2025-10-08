@@ -14,6 +14,162 @@ lazy_static! {
     static ref TEMP_MFA_SECRETS: Arc<Mutex<HashMap<String, String>>> = Arc::new(Mutex::new(HashMap::new()));
 }
 
+enum DBDialect {
+    Postgres,
+    MySql,
+}
+
+struct DBPool {
+    pool: Pool<Any>,
+    dialect: DBDialect,
+}
+
+impl DBPool {
+    pub async fn new(config: &Config) -> AppResult<Self> {
+        sqlx::any::install_default_drivers();
+        let database_url = config.database_url();
+
+        let p = AnyPoolOptions::new()
+            .max_connections(config.database.max_connections)
+            .min_connections(config.database.min_connections)
+            .acquire_timeout(Duration::from_secs(30))
+            .connect(&database_url)
+            .await?;
+
+        let d = match config.database.db_type.as_str() {
+            "postgresql" => DBDialect::Postgres,
+            _ => DBDialect::MySql,
+        };
+
+        return Ok(Self {
+            pool: p,
+            dialect: d,
+        });
+    }
+
+    pub async fn health_check(&self) -> AppResult<bool> {
+        let q = match self.dialect {
+            DBDialect::Postgres => "SELECT 1 as health",
+            DBDialect::MySql => "SELECT 1 as health",
+        };
+        let row = sqlx::query(q).fetch_one(&self.pool).await?;
+        let n: i32 = row.try_get("health")?;
+        Ok(n == 1)
+    }
+
+    pub async fn verify_api_key(&self, api_key: &str) -> AppResult<bool> {
+        let q = match self.dialect {
+            DBDialect::Postgres => r#"SELECT * FROM "APIKeys" WHERE apikey = $1"#,
+            DBDialect::MySql => "SELECT * FROM APIKeys WHERE APIKey = ?",
+        };
+
+        let row = sqlx::query(q)
+            .bind(api_key)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        Ok(row.is_some())
+    }
+
+    pub async fn verify_password(&self, username: &str, password: &str) -> AppResult<bool> {
+        use crate::services::auth::verify_password;
+        let q = match self.dialect {
+            DBDialect::Postgres => r#"SELECT hashed_pw FROM "Users" WHERE username = $1"#,
+            DBDialect::MySql => "SELECT Hashed_PW FROM Users WHERE Username = ?",
+        };
+
+        let row = sqlx::query(q)
+            .bind(username)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        let stored_hash = if let Some(row) = row {
+            row.try_get::<String, _>("Hashed_PW")?
+        } else {
+            return Ok(false);
+        };
+
+        verify_password(password, &stored_hash)
+    }
+
+    pub async fn get_api_key(&self, username: &str) -> AppResult<String> {
+        let q = match self.dialect {
+            DBDialect::Postgres => r#"SELECT userid FROM "Users" WHERE username = $1"#,
+            DBDialect::MySql => "SELECT UserID FROM Users WHERE Username = ?",
+        };
+
+        let user_row = sqlx::query(q)
+            .bind(username)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        let user_id: i32 = match user_row {
+            Some(row) => row.try_get("UserID")?,
+            None => return Err(AppError::not_found("User not found")),
+        };
+
+        let q = match self.dialect {
+            DBDialect::Postgres => r#"SELECT apikey FROM "APIKeys" WHERE userid = $1 LIMIT 1"#,
+            DBDialect::MySql => "SELECT APIKey FROM APIKeys WHERE UserID = ? LIMIT 1",
+        };
+
+        let api_row = sqlx::query(q)
+            .bind(user_id)
+            .fetch_optional(&self.pool)
+            .await?;
+        match api_row {
+            Some(row) => Ok(row.try_get("APIKey")?),
+            None => Err(AppError::not_found("API key not found for user")),
+        }
+    }
+
+    pub async fn get_user_id_from_api_key(&self, api_key: &str) -> AppResult<i32> {
+        let q = match self.dialect {
+            DBDialect::Postgres => r#"SELECT userid FROM "APIKeys" WHERE apikey = $1 LIMIT 1"#,
+            DBDialect::MySql => "SELECT UserID FROM APIKeys WHERE APIKey = ? LIMIT 1",
+        };
+
+        let row = sqlx::query(q).bind(api_key).fetch_one(&self.pool).await?;
+
+        Ok(row.try_get("UserID")?)
+    }
+
+    // Get user ID from username - for login and key creation
+    pub async fn get_user_id_from_username(&self, username: &str) -> AppResult<i32> {
+        let q = match self.dialect {
+            DBDialect::Postgres => r#"SELECT userid FROM "Users" WHERE username = $1"#,
+            DBDialect::MySql => "SELECT UserID FROM Users WHERE Username = ?",
+        };
+
+        let row = sqlx::query(q)
+            .bind(username)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        match row {
+            Some(row) => Ok(row.try_get("UserID")?),
+            None => Err(AppError::not_found("User not found")),
+        }
+    }
+
+    pub async fn get_user_details_by_id(
+        &self,
+        user_id: i32,
+    ) -> AppResult<crate::handlers::auth::UserDetails> {
+        let q = match self.dialect {
+            DBDialect::Postgres => r#"SELECT * FROM "Users" WHERE userid = $1"#,
+            DBDialect::MySql => "SELECT * FROM Users WHERE UserID = ?",
+        };
+
+        let user_details: crate::handlers::auth::UserDetails = sqlx::query_as(q)
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(user_details)
+    }
+}
+
 #[derive(Clone)]
 pub enum DatabasePool {
     Postgres(Pool<Postgres>),

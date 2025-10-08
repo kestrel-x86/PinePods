@@ -52,6 +52,7 @@ pub struct GetUserResponse {
 
 #[derive(Serialize)]
 #[allow(non_snake_case)]
+#[derive(sqlx::FromRow)]
 pub struct UserDetails {
     pub UserID: i32,
     pub Fullname: Option<String>,
