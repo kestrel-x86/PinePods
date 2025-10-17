@@ -479,6 +479,9 @@ pub fn downloads() -> Html {
         Callback::from(move |_: MouseEvent| {
             let dispatch_cloned = dispatch.clone();
             let page_state_cloned = page_state.clone();
+            let i18n_successfully_deleted_episodes_clone =
+                i18n_successfully_deleted_episodes.clone();
+            let i18n_failed_to_delete_episodes_clone = i18n_failed_to_delete_episodes.clone();
 
             dispatch.reduce_mut(move |state| {
                 let selected_episodes = state.selected_episodes_for_deletion.clone();
@@ -498,14 +501,14 @@ pub fn downloads() -> Html {
                                 state.info_message = Some(format!(
                                     "{} {}",
                                     selected_episodes.len(),
-                                    &i18n_successfully_deleted_episodes
+                                    i18n_successfully_deleted_episodes_clone
                                 ));
                             });
                         }
                         Err(e) => {
                             web_sys::console::log_1(&format!("Error deleting episodes: {:?}", e).into());
                             dispatch_for_future.reduce_mut(|state| {
-                                state.error_message = Some(i18n_failed_to_delete_episodes.clone());
+                                state.error_message = Some(i18n_failed_to_delete_episodes_clone);
                             });
                         }
                     }
@@ -695,7 +698,7 @@ pub fn downloads() -> Html {
                                             <input
                                                 type="text"
                                                 class="search-input"
-                                                placeholder={&i18n_search_downloaded_episodes}
+                                                placeholder={i18n_search_downloaded_episodes}
                                                 value={(*episode_search_term).clone()}
                                                 oninput={let episode_search_term = episode_search_term.clone();
                                                     Callback::from(move |e: InputEvent| {
