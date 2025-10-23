@@ -213,7 +213,9 @@ pub async fn login_new_server_secure(
             let login_response = response.json::<LoginResponse>().await?;
             
             // Check if MFA is required
-            if login_response.status == "mfa_required" && login_response.mfa_required.unwrap_or(false) {
+            if login_response.status == "mfa_required"
+                && login_response.mfa_required.unwrap_or(false)
+            {
                 return Ok(LoginResult::MfaRequired {
                     server_name,
                     username,
@@ -221,11 +223,11 @@ pub async fn login_new_server_secure(
                     mfa_session_token: login_response.mfa_session_token.unwrap(),
                 });
             }
-            
+
             // Normal flow - MFA not required, proceed with existing logic
-            let api_key = login_response.retrieved_key.ok_or_else(|| {
-                anyhow::Error::msg("No API key returned from server")
-            })?;
+            let api_key = login_response
+                .retrieved_key
+                .ok_or_else(|| anyhow::Error::msg("No API key returned from server"))?;
 
             // Continue with existing verification steps
             let result = complete_login_flow(server_name, username, password, api_key).await?;
@@ -245,15 +247,16 @@ pub async fn complete_mfa_login(
     mfa_code: String,
 ) -> Result<(GetUserDetails, LoginServerRequest, GetApiDetails), anyhow::Error> {
     // Verify MFA and get API key
-    let mfa_response = call_verify_mfa_and_get_key(&server_name, mfa_session_token, mfa_code).await?;
+    let mfa_response =
+        call_verify_mfa_and_get_key(&server_name, mfa_session_token, mfa_code).await?;
     
     if !mfa_response.verified || mfa_response.status != "success" {
         return Err(anyhow::Error::msg("MFA verification failed"));
     }
     
-    let api_key = mfa_response.retrieved_key.ok_or_else(|| {
-        anyhow::Error::msg("No API key returned after MFA verification")
-    })?;
+    let api_key = mfa_response
+        .retrieved_key
+        .ok_or_else(|| anyhow::Error::msg("No API key returned after MFA verification"))?;
     
     // Complete the login flow with the verified API key
     complete_login_flow(server_name, username, "".to_string(), api_key).await
@@ -281,7 +284,11 @@ async fn complete_login_flow(
     let login_request = LoginServerRequest {
         server_name: server_name.clone(),
         username: Some(username.clone()),
-        password: if password.is_empty() { None } else { Some(password) },
+        password: if password.is_empty() {
+            None
+        } else {
+            Some(password)
+        },
         api_key: Some(api_key.clone()),
     };
 
@@ -344,9 +351,9 @@ pub async fn login_new_server(
                 ));
             }
             
-            let api_key = login_response.retrieved_key.ok_or_else(|| {
-                anyhow::Error::msg("No API key returned from server")
-            })?;
+            let api_key = login_response
+                .retrieved_key
+                .ok_or_else(|| anyhow::Error::msg("No API key returned from server"))?;
 
             // Step 2: Verify the API key
             let verify_response = call_verify_key(&server_name, &api_key).await?;
@@ -697,7 +704,10 @@ pub async fn call_verify_mfa_and_get_key(
     mfa_code: String,
 ) -> Result<VerifyMfaLoginResponse, Error> {
     let url = format!("{}/api/data/verify_mfa_and_get_key", server_name);
-    let body = VerifyMfaLoginRequest { mfa_session_token, mfa_code };
+    let body = VerifyMfaLoginRequest {
+        mfa_session_token,
+        mfa_code,
+    };
     let request_body = serde_json::to_string(&body)?;
 
     let response = Request::post(&url)
@@ -936,7 +946,11 @@ pub async fn call_store_oidc_state(
     origin_url: Option<String>,
 ) -> Result<(), Error> {
     let url = format!("{}/api/auth/store_state", server_name);
-    let request_body = StoreStateRequest { state, client_id, origin_url };
+    let request_body = StoreStateRequest {
+        state,
+        client_id,
+        origin_url,
+    };
 
     let response = Request::post(&url).json(&request_body)?.send().await?;
 

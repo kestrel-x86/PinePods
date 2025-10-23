@@ -1,7 +1,6 @@
 use crate::components::context::{AppState, UIState};
 use crate::components::gen_components::{AdminSetupData, FirstAdminModal};
 use crate::components::gen_funcs::format_error_message;
-use i18nrs::yew::use_translation;
 use crate::components::gen_funcs::{encode_password, validate_user_input, ValidationError};
 use crate::components::notification_center::ToastNotification;
 use crate::components::setting_components::theme_options::initialize_default_theme;
@@ -18,6 +17,7 @@ use crate::requests::setting_reqs::{
     AvailableLanguage,
 };
 use chrono_tz::{Tz, TZ_VARIANTS};
+use i18nrs::yew::use_translation;
 use md5;
 use rand::Rng;
 use wasm_bindgen::JsCast;
@@ -47,7 +47,9 @@ pub fn login() -> Html {
     let i18n_account_created_success = i18n.t("login.account_created_successfully").to_string();
     let i18n_error_creating_account = i18n.t("login.error_creating_account").to_string();
     let i18n_error_checking_mfa = i18n.t("login.error_checking_mfa_status").to_string();
-    let i18n_error_checking_first_login = i18n.t("login.error_checking_first_login_status").to_string();
+    let i18n_error_checking_first_login = i18n
+        .t("login.error_checking_first_login_status")
+        .to_string();
     let i18n_credentials_incorrect = i18n.t("login.credentials_incorrect").to_string();
     let i18n_error_setting_up_timezone = i18n.t("login.error_setting_up_timezone").to_string();
     let i18n_first_time_welcome = i18n.t("login.first_time_welcome").to_string();
@@ -139,7 +141,9 @@ pub fn login() -> Html {
                     first_admin_created.set(admin_created);
                 }
                 Err(e) => {
-                    web_sys::console::log_1(&format!("{}: {:?}", i18n_error_checking_status, e).into());
+                    web_sys::console::log_1(
+                        &format!("{}: {:?}", i18n_error_checking_status, e).into(),
+                    );
                 }
             }
         });
@@ -638,9 +642,8 @@ pub fn login() -> Html {
                                         }
                                         Err(_) => {
                                             post_state.reduce_mut(|state| {
-                                                state.error_message = Option::from(
-                                                    (&i18n_error_checking_mfa).clone(),
-                                                )
+                                                state.error_message =
+                                                    Option::from((&i18n_error_checking_mfa).clone())
                                             });
                                         }
                                     }
@@ -650,9 +653,8 @@ pub fn login() -> Html {
                             }
                             Err(_) => {
                                 post_state.reduce_mut(|state| {
-                                    state.error_message = Option::from(
-                                        (&i18n_error_checking_first_login).clone(),
-                                    )
+                                    state.error_message =
+                                        Option::from((&i18n_error_checking_first_login).clone())
                                 });
                             }
                         }
@@ -871,9 +873,8 @@ pub fn login() -> Html {
                                     if success {
                                         page_state.set(PageState::Default);
                                         create_state.reduce_mut(|state| {
-                                            state.info_message = Some(
-                                                (&i18n_account_created_success).clone(),
-                                            )
+                                            state.info_message =
+                                                Some((&i18n_account_created_success).clone())
                                         });
                                     }
                                 }
@@ -889,8 +890,10 @@ pub fn login() -> Html {
                     Err(e) => {
                         let formatted_error = format_error_message(&e.to_string());
                         create_state.reduce_mut(|state| {
-                            state.error_message =
-                                Some(format!("{}: {}", i18n_error_creating_account, formatted_error))
+                            state.error_message = Some(format!(
+                                "{}: {}",
+                                i18n_error_creating_account, formatted_error
+                            ))
                         });
                     }
                 }
@@ -1115,8 +1118,7 @@ pub fn login() -> Html {
             // Validate password confirmation
             if reset_password.is_empty() || reset_password_confirm.is_empty() {
                 dispatch.reduce_mut(|state| {
-                    state.error_message =
-                        Option::from(i18n_fill_password_fields.clone());
+                    state.error_message = Option::from(i18n_fill_password_fields.clone());
                 });
                 return;
             }
@@ -1130,8 +1132,7 @@ pub fn login() -> Html {
 
             if reset_code.is_empty() {
                 dispatch.reduce_mut(|state| {
-                    state.error_message =
-                        Option::from(i18n_enter_reset_code.clone());
+                    state.error_message = Option::from(i18n_enter_reset_code.clone());
                 });
                 return;
             }
@@ -1159,11 +1160,13 @@ pub fn login() -> Html {
                                 if success.message == i18n_password_reset_successfully {
                                     page_state.set(PageState::Default);
                                     dispatch.reduce_mut(|state| {
-                                        state.info_message = Option::from(i18n_password_reset_success.clone());
+                                        state.info_message =
+                                            Option::from(i18n_password_reset_success.clone());
                                     });
                                 } else {
                                     dispatch.reduce_mut(|state| {
-                                        state.error_message = Option::from(i18n_invalid_reset_code.clone());
+                                        state.error_message =
+                                            Option::from(i18n_invalid_reset_code.clone());
                                     });
                                 }
                             }
@@ -1753,8 +1756,7 @@ pub fn login() -> Html {
                     Ok(_) => {
                         first_admin_created.set(true);
                         audio_dispatch.reduce_mut(|state| {
-                            state.info_message =
-                                Some(i18n_admin_created_success.clone());
+                            state.info_message = Some(i18n_admin_created_success.clone());
                         });
                         history.push("/"); // Redirect to login
                     }
@@ -2019,7 +2021,9 @@ pub fn login() -> Html {
     
     // Pre-capture translation strings for use in closures and async blocks
     let i18n_error_checking_mfa = i18n.t("login.error_checking_mfa_status").to_string();
-    let i18n_error_checking_first_login = i18n.t("login.error_checking_first_login_status").to_string();
+    let i18n_error_checking_first_login = i18n
+        .t("login.error_checking_first_login_status")
+        .to_string();
     let i18n_credentials_incorrect = i18n.t("login.credentials_incorrect").to_string();
     let i18n_error_setting_up_timezone = i18n.t("login.error_setting_up_timezone").to_string();
     let i18n_forgot_password = i18n.t("login.forgot_password").to_string();
@@ -2313,9 +2317,8 @@ pub fn login() -> Html {
                                         }
                                         Err(_) => {
                                             post_state.reduce_mut(|state| {
-                                                state.error_message = Option::from(
-                                                    (&i18n_error_checking_mfa).clone(),
-                                                )
+                                                state.error_message =
+                                                    Option::from((&i18n_error_checking_mfa).clone())
                                             });
                                         }
                                     }
@@ -2325,9 +2328,8 @@ pub fn login() -> Html {
                             }
                             Err(_) => {
                                 post_state.reduce_mut(|state| {
-                                    state.error_message = Option::from(
-                                        (&i18n_error_checking_first_login).clone(),
-                                    )
+                                    state.error_message =
+                                        Option::from((&i18n_error_checking_first_login).clone())
                                 });
                             }
                         }

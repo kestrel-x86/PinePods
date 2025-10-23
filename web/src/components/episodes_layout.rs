@@ -4,7 +4,7 @@ use crate::components::audio::AudioPlayer;
 use crate::components::click_events::create_on_title_click;
 use crate::components::context::{AppState, UIState};
 use crate::components::gen_funcs::{
-    format_error_message, get_filter_preference, set_filter_preference, get_default_sort_direction,
+    format_error_message, get_default_sort_direction, get_filter_preference, set_filter_preference,
 };
 use crate::components::host_component::HostDropdown;
 use crate::components::podcast_layout::ClickedFeedURL;
@@ -18,15 +18,16 @@ use crate::requests::pod_req::{
     call_get_podcast_id_from_ep_name, call_get_podcast_notifications_status, call_get_rss_key,
     call_remove_category, call_remove_podcasts_name, call_remove_youtube_channel,
     call_set_playback_speed, call_toggle_podcast_notifications, call_update_feed_cutoff_days,
-    AddCategoryRequest, AutoDownloadRequest, BulkEpisodeActionRequest,
-    ClearPlaybackSpeedRequest, DownloadAllPodcastRequest, FetchPodcasting2PodDataRequest,
-    PlaybackSpeedRequest, PodcastValues, RemoveCategoryRequest, RemovePodcastValuesName,
-    RemoveYouTubeChannelValues, SkipTimesRequest, UpdateFeedCutoffDaysRequest,
+    AddCategoryRequest, AutoDownloadRequest, BulkEpisodeActionRequest, ClearPlaybackSpeedRequest,
+    DownloadAllPodcastRequest, FetchPodcasting2PodDataRequest, PlaybackSpeedRequest, PodcastValues,
+    RemoveCategoryRequest, RemovePodcastValuesName, RemoveYouTubeChannelValues, SkipTimesRequest,
+    UpdateFeedCutoffDaysRequest,
 };
 use crate::requests::search_pods::call_get_podcast_details_dynamic;
 use crate::requests::search_pods::call_get_podcast_episodes;
 use htmlentity::entity::decode;
 use htmlentity::entity::ICodedDataTrait;
+use i18nrs::yew::use_translation;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use wasm_bindgen::closure::Closure;
@@ -40,7 +41,6 @@ use yew::Properties;
 use yew::{function_component, html, use_effect_with, use_node_ref, Callback, Html, TargetCast};
 use yew_router::history::{BrowserHistory, History};
 use yewdux::prelude::*;
-use i18nrs::yew::use_translation;
 
 fn add_icon() -> Html {
     html! {
@@ -188,17 +188,33 @@ pub fn episode_layout() -> Html {
     // Capture i18n strings before they get moved - this is a large component with many strings
     let i18n_invalid_html_content = i18n.t("episodes_layout.invalid_html_content").to_string();
     let i18n_unable_to_retrieve_url = i18n.t("episode.unable_to_retrieve_url").to_string();
-    let i18n_youtube_channel_successfully_removed = i18n.t("episodes_layout.youtube_channel_successfully_removed").to_string();
-    let i18n_podcast_successfully_removed = i18n.t("episodes_layout.podcast_successfully_removed").to_string();
-    let i18n_failed_to_remove_youtube_channel = i18n.t("episodes_layout.failed_to_remove_youtube_channel").to_string();
-    let i18n_failed_to_remove_podcast = i18n.t("episodes_layout.failed_to_remove_podcast").to_string();
+    let i18n_youtube_channel_successfully_removed = i18n
+        .t("episodes_layout.youtube_channel_successfully_removed")
+        .to_string();
+    let i18n_podcast_successfully_removed = i18n
+        .t("episodes_layout.podcast_successfully_removed")
+        .to_string();
+    let i18n_failed_to_remove_youtube_channel = i18n
+        .t("episodes_layout.failed_to_remove_youtube_channel")
+        .to_string();
+    let i18n_failed_to_remove_podcast = i18n
+        .t("episodes_layout.failed_to_remove_podcast")
+        .to_string();
     let i18n_playback_speed_updated = i18n.t("episodes_layout.playback_speed_updated").to_string();
-    let i18n_error_updating_playback_speed = i18n.t("episodes_layout.error_updating_playback_speed").to_string();
+    let i18n_error_updating_playback_speed = i18n
+        .t("episodes_layout.error_updating_playback_speed")
+        .to_string();
     let i18n_playback_speed_reset = i18n.t("episodes_layout.playback_speed_reset").to_string();
-    let i18n_error_resetting_playback_speed = i18n.t("episodes_layout.error_resetting_playback_speed").to_string();
+    let i18n_error_resetting_playback_speed = i18n
+        .t("episodes_layout.error_resetting_playback_speed")
+        .to_string();
     let i18n_skip_times_adjusted = i18n.t("episodes_layout.skip_times_adjusted").to_string();
-    let i18n_error_adjusting_skip_times = i18n.t("episodes_layout.error_adjusting_skip_times").to_string();
-    let i18n_podcast_successfully_added = i18n.t("episodes_layout.podcast_successfully_added").to_string();
+    let i18n_error_adjusting_skip_times = i18n
+        .t("episodes_layout.error_adjusting_skip_times")
+        .to_string();
+    let i18n_podcast_successfully_added = i18n
+        .t("episodes_layout.podcast_successfully_added")
+        .to_string();
     let i18n_failed_to_add_podcast = i18n.t("episodes_layout.failed_to_add_podcast").to_string();
     let i18n_rss_feed_url = i18n.t("episodes_layout.rss_feed_url").to_string();
     let i18n_close_modal = i18n.t("common.close_modal").to_string();
@@ -207,7 +223,9 @@ pub fn episode_layout() -> Html {
     let i18n_save = i18n.t("common.save").to_string();
     let i18n_reset = i18n.t("common.reset").to_string();
     let i18n_confirm = i18n.t("common.confirm").to_string();
-    let i18n_no_categories_available = i18n.t("episodes_layout.no_categories_available").to_string();
+    let i18n_no_categories_available = i18n
+        .t("episodes_layout.no_categories_available")
+        .to_string();
     let i18n_new_category = i18n.t("episodes_layout.new_category").to_string();
     let i18n_add = i18n.t("common.add").to_string();
     let i18n_verify_downloads = i18n.t("episodes_layout.verify_downloads").to_string();
@@ -216,35 +234,57 @@ pub fn episode_layout() -> Html {
     let i18n_get_rss_feed_url = i18n.t("episodes_layout.get_rss_feed_url").to_string();
     let i18n_download_all_episodes = i18n.t("episodes_layout.download_all_episodes").to_string();
     let i18n_add_remove_podcast = i18n.t("episodes_layout.add_remove_podcast").to_string();
-    let i18n_podcast_specific_settings = i18n.t("episodes_layout.podcast_specific_settings").to_string();
+    let i18n_podcast_specific_settings = i18n
+        .t("episodes_layout.podcast_specific_settings")
+        .to_string();
     let i18n_explicit_yes = i18n.t("common.yes").to_string();
     let i18n_explicit_no = i18n.t("common.no").to_string();
     let i18n_match_it_here = i18n.t("episodes_layout.match_it_here").to_string();
     let i18n_hosts = i18n.t("episodes_layout.hosts").to_string();
     
     // Additional i18n strings used throughout the component
-    let i18n_category_name_cannot_be_empty = i18n.t("episodes_layout.category_name_cannot_be_empty").to_string();
+    let i18n_category_name_cannot_be_empty = i18n
+        .t("episodes_layout.category_name_cannot_be_empty")
+        .to_string();
     let i18n_loading_rss_key = i18n.t("episodes_layout.loading_rss_key").to_string();
     let i18n_rss_feed_url = i18n.t("episodes_layout.rss_feed_url").to_string();
     let i18n_rss_feed_note = i18n.t("episodes_layout.rss_feed_note").to_string();
     let i18n_rss_feed_instruction = i18n.t("episodes_layout.rss_feed_instruction").to_string();
     let i18n_rss_feed_warning = i18n.t("episodes_layout.rss_feed_warning").to_string();
-    let i18n_download_future_episodes = i18n.t("episodes_layout.download_future_episodes").to_string();
-    let i18n_get_notifications_new_episodes = i18n.t("episodes_layout.get_notifications_new_episodes").to_string();
+    let i18n_download_future_episodes = i18n
+        .t("episodes_layout.download_future_episodes")
+        .to_string();
+    let i18n_get_notifications_new_episodes = i18n
+        .t("episodes_layout.get_notifications_new_episodes")
+        .to_string();
     let i18n_default_playback_speed = i18n.t("episodes_layout.default_playback_speed").to_string();
-    let i18n_playback_speed_description = i18n.t("episodes_layout.playback_speed_description").to_string();
-    let i18n_auto_skip_intros_outros = i18n.t("episodes_layout.auto_skip_intros_outros").to_string();
+    let i18n_playback_speed_description = i18n
+        .t("episodes_layout.playback_speed_description")
+        .to_string();
+    let i18n_auto_skip_intros_outros = i18n
+        .t("episodes_layout.auto_skip_intros_outros")
+        .to_string();
     let i18n_start_skip_seconds = i18n.t("episodes_layout.start_skip_seconds").to_string();
     let i18n_end_skip_seconds = i18n.t("episodes_layout.end_skip_seconds").to_string();
     let i18n_youtube_download_limit = i18n.t("episodes_layout.youtube_download_limit").to_string();
-    let i18n_youtube_limit_description = i18n.t("episodes_layout.youtube_limit_description").to_string();
-    let i18n_adjust_podcast_categories = i18n.t("episodes_layout.adjust_podcast_categories").to_string();
+    let i18n_youtube_limit_description = i18n
+        .t("episodes_layout.youtube_limit_description")
+        .to_string();
+    let i18n_adjust_podcast_categories = i18n
+        .t("episodes_layout.adjust_podcast_categories")
+        .to_string();
     let i18n_loading = i18n.t("episodes_layout.loading").to_string();
-    let i18n_new_category_placeholder = i18n.t("episodes_layout.new_category_placeholder").to_string();
-    let i18n_download_all_confirmation = i18n.t("episodes_layout.download_all_confirmation").to_string();
+    let i18n_new_category_placeholder = i18n
+        .t("episodes_layout.new_category_placeholder")
+        .to_string();
+    let i18n_download_all_confirmation = i18n
+        .t("episodes_layout.download_all_confirmation")
+        .to_string();
     let i18n_yes_download_all = i18n.t("episodes_layout.yes_download_all").to_string();
     let i18n_no_take_me_back = i18n.t("episodes_layout.no_take_me_back").to_string();
-    let i18n_delete_podcast_confirmation = i18n.t("episodes_layout.delete_podcast_confirmation").to_string();
+    let i18n_delete_podcast_confirmation = i18n
+        .t("episodes_layout.delete_podcast_confirmation")
+        .to_string();
     let i18n_yes_delete_podcast = i18n.t("episodes_layout.yes_delete_podcast").to_string();
     let i18n_show_only = i18n.t("episodes_layout.show_only").to_string();
     let i18n_showing_only_completed = i18n.t("episodes_layout.showing_only_completed").to_string();
@@ -257,7 +297,9 @@ pub fn episode_layout() -> Html {
     let i18n_explicit = i18n.t("episodes_layout.explicit").to_string();
     let i18n_yes = i18n.t("episodes_layout.yes").to_string();
     let i18n_no = i18n.t("episodes_layout.no").to_string();
-    let i18n_search_episodes_placeholder = i18n.t("episodes_layout.search_episodes_placeholder").to_string();
+    let i18n_search_episodes_placeholder = i18n
+        .t("episodes_layout.search_episodes_placeholder")
+        .to_string();
     let i18n_newest_first = i18n.t("episodes_layout.newest_first").to_string();
     let i18n_oldest_first = i18n.t("episodes_layout.oldest_first").to_string();
     let i18n_shortest_first = i18n.t("episodes_layout.shortest_first").to_string();
@@ -275,12 +317,22 @@ pub fn episode_layout() -> Html {
     let i18n_queue_episodes = i18n.t("episodes_layout.queue_episodes").to_string();
     let i18n_download_episodes = i18n.t("episodes_layout.download_episodes").to_string();
     let i18n_no_episodes_found = i18n.t("episodes_layout.no_episodes_found").to_string();
-    let i18n_no_episodes_description = i18n.t("episodes_layout.no_episodes_description").to_string();
-    let i18n_youtube_episode_limit_updated = i18n.t("episodes_layout.youtube_episode_limit_updated").to_string();
+    let i18n_no_episodes_description = i18n
+        .t("episodes_layout.no_episodes_description")
+        .to_string();
+    let i18n_youtube_episode_limit_updated = i18n
+        .t("episodes_layout.youtube_episode_limit_updated")
+        .to_string();
     let i18n_skip_times_adjusted = i18n.t("episodes_layout.skip_times_adjusted").to_string();
-    let i18n_error_adjusting_skip_times = i18n.t("episodes_layout.error_adjusting_skip_times").to_string();
-    let i18n_playback_speed_reset_default = i18n.t("episodes_layout.playback_speed_reset_default").to_string();
-    let i18n_error_resetting_playback_speed = i18n.t("episodes_layout.error_resetting_playback_speed").to_string();
+    let i18n_error_adjusting_skip_times = i18n
+        .t("episodes_layout.error_adjusting_skip_times")
+        .to_string();
+    let i18n_playback_speed_reset_default = i18n
+        .t("episodes_layout.playback_speed_reset_default")
+        .to_string();
+    let i18n_error_resetting_playback_speed = i18n
+        .t("episodes_layout.error_resetting_playback_speed")
+        .to_string();
     let loading = use_state(|| true);
     let page_state = use_state(|| PageState::Hidden);
     let episode_search_term = use_state(|| String::new());
@@ -613,16 +665,19 @@ pub fn episode_layout() -> Html {
                 effect_added.clone(),
             ),
             move |_| {
-                let episode_name: Option<String> = click_state
+                let episode_name = click_state
+                    .podcast_feed_results
+                    .as_ref()
+                    .and_then(|r| r.episodes.get(0))
+                    .and_then(|ep| Some(ep.episodetitle.clone()))
+                    .unwrap_or_default();
+
+                let episode_url = click_state
                     .podcast_feed_results
                     .as_ref()
                     .and_then(|results| results.episodes.get(0))
-                    .and_then(|episode| episode.title.clone());
-                let episode_url: Option<String> = click_state
-                    .podcast_feed_results
-                    .as_ref()
-                    .and_then(|results| results.episodes.get(0))
-                    .and_then(|episode| episode.enclosure_url.clone());
+                    .and_then(|episode| Some(episode.episodeurl.clone()))
+                    .unwrap_or_default();
 
                 let bool_true = *effect_added; // Dereference here
 
@@ -636,7 +691,7 @@ pub fn episode_layout() -> Html {
                     let episode_url = episode_url;
                     let user_id = user_id.unwrap();
 
-                    if episode_name.is_some() && episode_url.is_some() {
+                    if !episode_name.is_empty() && !episode_url.is_empty() {
                         wasm_bindgen_futures::spawn_local(async move {
                             if let (Some(api_key), Some(server_name)) =
                                 (api_key.as_ref(), server_name.as_ref())
@@ -644,8 +699,8 @@ pub fn episode_layout() -> Html {
                                 match call_get_podcast_id_from_ep_name(
                                     &server_name,
                                     &api_key,
-                                    episode_name.unwrap(),
-                                    episode_url.unwrap(),
+                                    episode_name,
+                                    episode_url,
                                     user_id,
                                 )
                                 .await
@@ -850,16 +905,19 @@ pub fn episode_layout() -> Html {
         let app_dispatch = _search_dispatch.clone();
         let call_is_added = is_added.clone();
         let page_state = page_state.clone();
-        let i18n_youtube_channel_successfully_removed = i18n_youtube_channel_successfully_removed.clone();
+        let i18n_youtube_channel_successfully_removed =
+            i18n_youtube_channel_successfully_removed.clone();
         let i18n_podcast_successfully_removed = i18n_podcast_successfully_removed.clone();
         let i18n_failed_to_remove_youtube_channel = i18n_failed_to_remove_youtube_channel.clone();
         let i18n_failed_to_remove_podcast = i18n_failed_to_remove_podcast.clone();
 
         Callback::from(move |e: MouseEvent| {
             e.prevent_default();
-            let i18n_youtube_channel_successfully_removed = i18n_youtube_channel_successfully_removed.clone();
+            let i18n_youtube_channel_successfully_removed =
+                i18n_youtube_channel_successfully_removed.clone();
             let i18n_podcast_successfully_removed = i18n_podcast_successfully_removed.clone();
-            let i18n_failed_to_remove_youtube_channel = i18n_failed_to_remove_youtube_channel.clone();
+            let i18n_failed_to_remove_youtube_channel =
+                i18n_failed_to_remove_youtube_channel.clone();
             let i18n_failed_to_remove_podcast = i18n_failed_to_remove_podcast.clone();
             let hist = delete_history.clone();
             let page_state = page_state.clone();
@@ -978,7 +1036,7 @@ pub fn episode_layout() -> Html {
                     .podcast_feed_results
                     .as_ref()
                     .and_then(|results| results.episodes.get(0))
-                    .and_then(|episode| episode.episode_id)
+                    .and_then(|episode| Some(episode.episodeid))
                 {
                     Some(id) => id,
                     None => {
@@ -990,7 +1048,7 @@ pub fn episode_layout() -> Html {
                     .podcast_feed_results
                     .as_ref()
                     .and_then(|results| results.episodes.get(0))
-                    .and_then(|episode| episode.is_youtube)
+                    .and_then(|episode| Some(episode.is_youtube))
                 {
                     Some(id) => id,
                     None => {
@@ -1190,8 +1248,7 @@ pub fn episode_layout() -> Html {
                     match call_set_playback_speed(&server_name, &api_key, &request).await {
                         Ok(_) => {
                             call_dispatch.reduce_mut(|state| {
-                                state.info_message =
-                                    Option::from(i18n_playback_speed_updated)
+                                state.info_message = Option::from(i18n_playback_speed_updated)
                             });
                         }
                         Err(e) => {
@@ -1235,8 +1292,7 @@ pub fn episode_layout() -> Html {
                     match call_clear_playback_speed(&server_name, &api_key, &request).await {
                         Ok(_) => {
                             call_dispatch.reduce_mut(|state| {
-                                state.info_message =
-                                    Option::from(i18n_playback_speed_reset_default)
+                                state.info_message = Option::from(i18n_playback_speed_reset_default)
                             });
                         }
                         Err(e) => {
@@ -1419,8 +1475,7 @@ pub fn episode_layout() -> Html {
                                 &format!("Error updating skip times: {}", e).into(),
                             );
                             skip_call_dispatch.reduce_mut(|state| {
-                                state.error_message =
-                                    Option::from(i18n_error_adjusting_skip_times)
+                                state.error_message = Option::from(i18n_error_adjusting_skip_times)
                             });
                         }
                     }
@@ -2101,8 +2156,7 @@ pub fn episode_layout() -> Html {
                                 });
                             } else {
                                 dispatch_wasm.reduce_mut(|state| {
-                                    state.error_message =
-                                        Option::from(i18n_failed_to_add_podcast)
+                                    state.error_message = Option::from(i18n_failed_to_add_podcast)
                                 });
                                 app_dispatch.reduce_mut(|state| state.is_loading = Some(false));
                             }
@@ -2146,23 +2200,25 @@ pub fn episode_layout() -> Html {
                     .filter(|episode| {
                         // Search filter
                         let matches_search = if !search.is_empty() {
-                            episode.title.as_ref().map_or(false, |title| {
-                                title.to_lowercase().contains(&search.to_lowercase())
-                            }) || episode.description.as_ref().map_or(false, |desc| {
-                                desc.to_lowercase().contains(&search.to_lowercase())
-                            })
+                            episode
+                                .episodetitle
+                                .to_lowercase()
+                                .contains(&search.to_lowercase())
+                                || episode
+                                    .episodedescription
+                                    .to_lowercase()
+                                    .contains(&search.to_lowercase())
                         } else {
                             true
                         };
 
                         // Status filter
                         let matches_status = if **show_in_progress {
-                            !episode.completed.unwrap_or(false)
-                                && episode.listen_duration.unwrap_or(0) > 0
+                            !episode.completed && episode.listenduration.unwrap_or_default() > 0
                         } else {
                             match *completed_filter_state {
-                                CompletedFilter::ShowOnly => episode.completed.unwrap_or(false),
-                                CompletedFilter::Hide => !episode.completed.unwrap_or(false),
+                                CompletedFilter::ShowOnly => episode.completed,
+                                CompletedFilter::Hide => !episode.completed,
                                 CompletedFilter::ShowAll => true,
                             }
                         };
@@ -2175,12 +2231,20 @@ pub fn episode_layout() -> Html {
                 // Sort logic
                 if let Some(direction) = (*sort_dir).as_ref() {
                     filtered.sort_by(|a, b| match direction {
-                        EpisodeSortDirection::NewestFirst => b.pub_date.cmp(&a.pub_date),
-                        EpisodeSortDirection::OldestFirst => a.pub_date.cmp(&b.pub_date),
-                        EpisodeSortDirection::ShortestFirst => a.duration.cmp(&b.duration),
-                        EpisodeSortDirection::LongestFirst => b.duration.cmp(&a.duration),
-                        EpisodeSortDirection::TitleAZ => a.title.cmp(&b.title),
-                        EpisodeSortDirection::TitleZA => b.title.cmp(&a.title),
+                        EpisodeSortDirection::NewestFirst => {
+                            b.episodepubdate.cmp(&a.episodepubdate)
+                        }
+                        EpisodeSortDirection::OldestFirst => {
+                            a.episodepubdate.cmp(&b.episodepubdate)
+                        }
+                        EpisodeSortDirection::ShortestFirst => {
+                            a.episodeduration.cmp(&b.episodeduration)
+                        }
+                        EpisodeSortDirection::LongestFirst => {
+                            b.episodeduration.cmp(&a.episodeduration)
+                        }
+                        EpisodeSortDirection::TitleAZ => a.episodetitle.cmp(&b.episodetitle),
+                        EpisodeSortDirection::TitleZA => b.episodetitle.cmp(&a.episodetitle),
                     });
                 }
                 filtered
@@ -2198,7 +2262,6 @@ pub fn episode_layout() -> Html {
 
     let web_link = open_in_new_tab.clone();
     let pod_layout_data = clicked_podcast_info.clone();
-
 
     let (completed_icon, completed_text, completed_title) = match *completed_filter_state {
         CompletedFilter::ShowOnly => (
@@ -2753,7 +2816,7 @@ pub fn episode_layout() -> Html {
         let selected_episodes = selected_episodes_clone.clone();
         Callback::from(move |_| {
             let all_ids: HashSet<i32> = filtered_episodes.iter()
-                .filter_map(|ep| ep.episode_id)
+                    .map(|ep| ep.episodeid)
                 .collect();
             
             let current = (*selected_episodes).clone();
@@ -2772,7 +2835,7 @@ pub fn episode_layout() -> Html {
         {
             // this extra block is an expression, so valid
             let all_ids: HashSet<i32> = filtered_episodes_clone.iter()
-                .filter_map(|ep| ep.episode_id)
+                    .map(|ep| ep.episodeid)
                 .collect();
             let current = (*selected_episodes_clone).clone();
             if current.len() == all_ids.len() && all_ids.iter().all(|id| current.contains(id)) {
@@ -2792,8 +2855,8 @@ pub fn episode_layout() -> Html {
                                                                 let selected_episodes = selected_episodes_clone.clone();
                                                                 Callback::from(move |_| {
                                                                     let unplayed_ids: HashSet<i32> = filtered_episodes.iter()
-                                                                        .filter(|ep| !ep.completed.unwrap_or(false))
-                                                                        .filter_map(|ep| ep.episode_id)
+                                                                            .filter(|ep| !ep.completed)
+                                                                            .map(|ep| ep.episodeid)
                                                                         .collect();
                                                                     selected_episodes.set(unplayed_ids);
                                                                 })
@@ -3040,12 +3103,12 @@ pub fn episode_layout() -> Html {
                                     let selected_episodes_older = selected_episodes.clone();
                                     let on_select_older = Callback::from(move |cutoff_episode_id: i32| {
                                         let cutoff_index = filtered_episodes_older.iter()
-                                            .position(|ep| ep.episode_id == Some(cutoff_episode_id))
+                                                .position(|ep| ep.episodeid == cutoff_episode_id)
                                             .unwrap_or(0);
                                         
                                         let older_ids: HashSet<i32> = filtered_episodes_older.iter()
                                             .skip(cutoff_index) // Include the cutoff episode and all after it (older in reverse chronological order)
-                                            .filter_map(|ep| ep.episode_id)
+                                                .map(|ep| ep.episodeid)
                                             .collect();
                                         
                                         selected_episodes_older.set({
@@ -3060,12 +3123,12 @@ pub fn episode_layout() -> Html {
                                     let selected_episodes_newer = selected_episodes.clone();
                                     let on_select_newer = Callback::from(move |cutoff_episode_id: i32| {
                                         let cutoff_index = filtered_episodes_newer.iter()
-                                            .position(|ep| ep.episode_id == Some(cutoff_episode_id))
+                                                .position(|ep| ep.episodeid == cutoff_episode_id)
                                             .unwrap_or(0);
                                         
                                         let newer_ids: HashSet<i32> = filtered_episodes_newer.iter()
                                             .take(cutoff_index + 1) // Include episodes before the cutoff (newer in reverse chronological order)
-                                            .filter_map(|ep| ep.episode_id)
+                                                .map(|ep| ep.episodeid)
                                             .collect();
                                         
                                         selected_episodes_newer.set({

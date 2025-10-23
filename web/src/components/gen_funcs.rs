@@ -8,7 +8,7 @@ use chrono_tz::Tz;
 use gloo_timers::callback::Timeout;
 use std::collections::HashMap;
 use std::str::FromStr;
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{DomParser, HtmlElement, SupportedType, TouchEvent};
 use yew::prelude::*;
 

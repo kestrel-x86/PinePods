@@ -1,4 +1,4 @@
-use crate::components::podcast_layout::ClickedFeedURL;
+use crate::{components::podcast_layout::ClickedFeedURL, requests::pod_req::Episode};
 use anyhow::Error;
 use chrono::{DateTime, Offset};
 use gloo_net::http::Request;
@@ -211,42 +211,42 @@ where
     deserializer.deserialize_option(StringOrIntVisitor)
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct Episode {
-    #[serde(rename = "Episodetitle")]
-    pub title: Option<String>,
-    #[serde(rename = "Episodedescription")]
-    pub description: Option<String>,
-    #[serde(rename = "Episodepubdate")]
-    pub pub_date: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub links: Vec<String>,
-    #[serde(rename = "Episodeurl")]
-    pub enclosure_url: Option<String>,
-    pub enclosure_length: Option<String>,
-    #[serde(rename = "Episodeartwork")]
-    pub artwork: Option<String>,
-    pub content: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub authors: Vec<String>,
-    pub guid: Option<String>,
-    #[serde(
-        rename = "Episodeduration",
-        deserialize_with = "deserialize_string_or_int"
-    )]
-    pub duration: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "Episodeid")]
-    pub episode_id: Option<i32>,
-    #[serde(default)]
-    pub is_youtube: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "Completed")]
-    pub completed: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "Listenduration")]
-    pub listen_duration: Option<i32>,
-}
+// #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+// pub struct Episode {
+//     #[serde(rename = "Episodetitle")]
+//     pub title: Option<String>,
+//     #[serde(rename = "Episodedescription")]
+//     pub description: Option<String>,
+//     #[serde(rename = "Episodepubdate")]
+//     pub pub_date: Option<String>,
+//     #[serde(skip_serializing_if = "Vec::is_empty", default)]
+//     pub links: Vec<String>,
+//     #[serde(rename = "Episodeurl")]
+//     pub enclosure_url: Option<String>,
+//     pub enclosure_length: Option<String>,
+//     #[serde(rename = "Episodeartwork")]
+//     pub artwork: Option<String>,
+//     pub content: Option<String>,
+//     #[serde(skip_serializing_if = "Vec::is_empty", default)]
+//     pub authors: Vec<String>,
+//     pub guid: Option<String>,
+//     #[serde(
+//         rename = "Episodeduration",
+//         deserialize_with = "deserialize_string_or_int"
+//     )]
+//     pub duration: Option<String>,
+//     #[serde(skip_serializing_if = "Option::is_none")]
+//     #[serde(rename = "Episodeid")]
+//     pub episode_id: Option<i32>,
+//     #[serde(default)]
+//     pub is_youtube: Option<bool>,
+//     #[serde(skip_serializing_if = "Option::is_none")]
+//     #[serde(rename = "Completed")]
+//     pub completed: Option<bool>,
+//     #[serde(skip_serializing_if = "Option::is_none")]
+//     #[serde(rename = "Listenduration")]
+//     pub listen_duration: Option<i32>,
+// }
 
 #[derive(Deserialize, Debug, PartialEq, Clone, Serialize)]
 pub struct PodcastFeedResult {
@@ -476,11 +476,10 @@ pub async fn call_get_podcast_episodes(
         .episodes
         .into_iter()
         .map(|mut episode| {
-            episode.guid = episode
-                .guid
-                .or_else(|| episode.episode_id.map(|id| id.to_string()));
-            episode.is_youtube = Some(false); // Set is_youtube to false for regular episodes
-                                              // Default values for new fields if not present
+            if episode.guid.is_empty() {
+                episode.guid = episode.episodeid.to_string();
+            }
+            episode.is_youtube = false;
             episode
         })
         .collect::<Vec<_>>();
@@ -521,10 +520,10 @@ pub async fn call_get_youtube_episodes(
         .episodes
         .into_iter()
         .map(|mut episode| {
-            episode.guid = episode
-                .guid
-                .or_else(|| episode.episode_id.map(|id| id.to_string()));
-            episode.is_youtube = Some(true); // Set is_youtube to true for YouTube episodes
+            if episode.guid.is_empty() {
+                episode.guid = episode.episodeid.to_string();
+            }
+            episode.is_youtube = true;
             episode
         })
         .collect::<Vec<_>>();
@@ -560,46 +559,24 @@ pub async fn call_parse_podcast_url(
         // Convert JSON episodes to Episode structs
         let mut episodes: Vec<Episode> = episodes_json
             .iter()
-            .map(|episode_json| {
-                Episode {
-                    title: episode_json["title"].as_str().map(|s| s.to_string()),
-                    description: episode_json["description"].as_str().map(|s| s.to_string()),
-                    content: episode_json["content"].as_str().map(|s| s.to_string()),
-                    enclosure_url: episode_json["enclosure_url"].as_str().map(|s| s.to_string()),
-                    enclosure_length: episode_json["enclosure_length"].as_str().map(|s| s.to_string()),
-                    pub_date: episode_json["pub_date"].as_str().map(|s| s.to_string()),
-                    artwork: episode_json["artwork"].as_str().map(|s| s.to_string()),
-                    duration: episode_json["duration"].as_i64().map(|d| d.to_string()),
-                    links: vec![],
-                    authors: vec![],
-                    guid: episode_json["guid"].as_str().map(|s| s.to_string()),
-                    episode_id: None,
-                    is_youtube: Some(false),
-                    completed: None,
-                    listen_duration: None,
-                }
-            })
+            .filter_map(|episode_json| Episode::from_json(episode_json).ok())
             .collect();
 
         // Sort episodes by publication date (newest first)
         episodes.sort_by(|a, b| {
-            fn parse_date(date_str: &Option<String>) -> Option<chrono::DateTime<chrono::Utc>> {
-                date_str.as_ref().and_then(|d| {
-                    chrono::DateTime::parse_from_rfc3339(d)
+            fn parse_date(date_str: &String) -> chrono::DateTime<chrono::Utc> {
+                if date_str.is_empty() {
+                    chrono::DateTime::<chrono::Utc>::MIN_UTC
+                } else {
+                    chrono::DateTime::parse_from_rfc3339(date_str)
                         .map(|dt| dt.with_timezone(&chrono::Utc))
-                        .ok()
-                })
+                        .unwrap_or(chrono::DateTime::<chrono::Utc>::MIN_UTC)
+                }
             }
 
-            let a_date = parse_date(&a.pub_date);
-            let b_date = parse_date(&b.pub_date);
-
-            match (a_date, b_date) {
-                (Some(a), Some(b)) => b.cmp(&a), // Newest first
-                (Some(_), None) => std::cmp::Ordering::Less,
-                (None, Some(_)) => std::cmp::Ordering::Greater,
-                (None, None) => std::cmp::Ordering::Equal,
-            }
+            let a_date = parse_date(&a.episodepubdate);
+            let b_date = parse_date(&b.episodepubdate);
+            a_date.cmp(&b_date)
         });
 
         Ok(PodcastFeedResult { episodes })
@@ -679,7 +656,7 @@ pub struct SearchRequest {
 
 #[derive(Deserialize, Debug, PartialEq, Clone)]
 pub struct SearchResponse {
-    pub data: Vec<SearchEpisode>,
+    pub data: Vec<Episode>,
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
@@ -716,7 +693,7 @@ pub async fn call_search_database(
     server_name: &String,
     api_key: &Option<String>,
     request_data: &SearchRequest,
-) -> Result<Vec<SearchEpisode>, Error> {
+) -> Result<Vec<Episode>, Error> {
     let url = format!("{}/api/data/search_data", server_name);
     let api_key_ref = api_key
         .as_deref()

@@ -3,13 +3,14 @@ use super::gen_components::{
     empty_message, on_shownotes_click, person_episode_item, Search_nav, UseScrollToTop,
 };
 use super::virtual_list::PersonEpisodeVirtualList;
-use i18nrs::yew::use_translation;
 use crate::components::audio::on_play_pause;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
 use crate::components::gen_funcs::sanitize_html_with_blank_target;
 use crate::requests::people_req::PersonEpisode;
 use crate::requests::people_req::{self, PersonSubscription};
+use crate::requests::pod_req::Episode;
+use i18nrs::yew::use_translation;
 use yew::prelude::*;
 use yew::{function_component, html, Html};
 use yew_router::history::BrowserHistory;
@@ -25,7 +26,7 @@ use wasm_bindgen::prelude::*;
 #[derive(Clone, PartialEq, Properties, Debug)]
 struct PersonWithEpisodes {
     person: PersonSubscription,
-    episodes: Vec<PersonEpisode>,
+    episodes: Vec<Episode>,
     is_expanded: bool,
 }
 
@@ -315,7 +316,7 @@ fn get_proxied_image_url(server_name: &str, original_url: String) -> String {
 
 fn render_host_with_episodes(
     person: &PersonSubscription,
-    episodes: Vec<PersonEpisode>,
+    episodes: Vec<Episode>,
     is_expanded: bool,
     toggle_host_expanded: Callback<MouseEvent>,
     state: Rc<AppState>,
@@ -422,17 +423,17 @@ fn render_host_with_episodes(
                                 episode_title_for_closure.clone(),
                                 episode_description_for_closure.clone(),
                                 format_release.clone(),
-                                episode_artwork_for_closure.clone().unwrap(),
+                                episode_artwork_for_closure.clone(),
                                 episode_duration_for_closure.clone(),
                                 episode_id_for_closure.clone(),
-                                Some(listener_duration_for_closure.clone()),
+                                listener_duration_for_closure.clone().unwrap_or_default(),
                                 api_key_play.unwrap().unwrap(),
                                 user_id_play.unwrap(),
                                 server_name_play.unwrap(),
                                 audio_dispatch.clone(),
                                 audio_state.clone(),
                                 None,
-                                episode_is_youtube.clone(),
+                                episode.is_youtube,
                             );
 
                             let on_shownotes_click = on_shownotes_click(
@@ -444,7 +445,7 @@ fn render_host_with_episodes(
                                 Some(String::from("Not needed")),
                                 true,
                                 Some(true),
-                                Some(false),
+                                false,
                             );
 
                             #[wasm_bindgen]
@@ -471,7 +472,7 @@ fn render_host_with_episodes(
                             };
                             let show_modal = *active_modal == Some(episode.episodeid);
                             person_episode_item(
-                                Box::new(episode.clone()),
+                                episode.clone(),
                                 sanitize_html_with_blank_target(&episode.episodedescription),
                                 desc_expanded,
                                 &format_release,
@@ -479,7 +480,7 @@ fn render_host_with_episodes(
                                 on_shownotes_click,
                                 toggle_expanded,
                                 episode.episodeduration,
-                                Some(episode.listenduration),
+                                episode.listenduration.clone().unwrap_or_default(),
                                 "people",
                                 Callback::noop(),
                                 false,

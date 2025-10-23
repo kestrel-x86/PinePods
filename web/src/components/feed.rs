@@ -1,7 +1,6 @@
 use super::app_drawer::App_drawer;
 use super::gen_components::{
-    empty_message, on_shownotes_click, use_long_press, virtual_episode_item, Search_nav,
-    UseScrollToTop,
+    empty_message, on_shownotes_click, use_long_press, Search_nav, UseScrollToTop,
 };
 use crate::components::audio::on_play_pause;
 use crate::components::audio::AudioPlayer;
@@ -13,6 +12,7 @@ use crate::requests::pod_req;
 use crate::requests::pod_req::Episode as EpisodeData;
 use crate::requests::pod_req::RecentEps;
 use gloo::events::EventListener;
+use i18nrs::yew::use_translation;
 use wasm_bindgen::JsCast;
 use web_sys::window;
 use web_sys::{Element, HtmlElement};
@@ -20,7 +20,6 @@ use yew::prelude::*;
 use yew::{function_component, html, Html};
 use yew_router::history::BrowserHistory;
 use yewdux::prelude::*;
-use i18nrs::yew::use_translation;
 
 use wasm_bindgen::prelude::*;
 
@@ -36,10 +35,13 @@ fn calculate_item_height(window_width: f64) -> f64 {
         221.0 + 16.0 // Desktop: episode container 221px + mb-4 margin
     };
     
-    web_sys::console::log_1(&format!(
+    web_sys::console::log_1(
+        &format!(
         "FEED HEIGHT CALC: width={}, calculated_height={}", 
         window_width, height
-    ).into());
+        )
+        .into(),
+    );
     
     height
 }
@@ -56,7 +58,8 @@ pub fn feed() -> Html {
     
     // Capture i18n strings before they get moved
     let i18n_no_recent_episodes_found = i18n.t("feed.no_recent_episodes_found").to_string();
-    let i18n_no_recent_episodes_description = i18n.t("feed.no_recent_episodes_description").to_string();
+    let i18n_no_recent_episodes_description =
+        i18n.t("feed.no_recent_episodes_description").to_string();
 
     // Fetch episodes on component mount
     let loading_ep = loading.clone();
@@ -243,7 +246,13 @@ pub fn virtual_list(props: &VirtualListProps) -> Html {
                 let width = window_clone.inner_width().unwrap().as_f64().unwrap();
                 let new_item_height = calculate_item_height(width);
 
-                web_sys::console::log_1(&format!("Virtual list: width={}, item_height={}", width, new_item_height).into());
+                web_sys::console::log_1(
+                    &format!(
+                        "Virtual list: width={}, item_height={}",
+                        width, new_item_height
+                    )
+                    .into(),
+                );
                 item_height.set(new_item_height);
                 force_update.set(*force_update + 1);
             });
@@ -285,12 +294,17 @@ pub fn virtual_list(props: &VirtualListProps) -> Html {
                                 // Use requestAnimationFrame to batch updates and prevent feedback
                                 let scroll_pos_clone2 = scroll_pos_clone.clone();
                                 let is_updating_clone = is_updating.clone();
-                                let callback = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
+                                let callback =
+                                    wasm_bindgen::closure::Closure::wrap(Box::new(move || {
                                     scroll_pos_clone2.set(new_scroll_top);
                                     *is_updating_clone.borrow_mut() = false;
-                                }) as Box<dyn FnMut()>);
+                                    })
+                                        as Box<dyn FnMut()>);
                                 
-                                web_sys::window().unwrap().request_animation_frame(callback.as_ref().unchecked_ref()).unwrap();
+                                web_sys::window()
+                                    .unwrap()
+                                    .request_animation_frame(callback.as_ref().unchecked_ref())
+                                    .unwrap();
                                 callback.forget();
                             }
                         }
@@ -381,7 +395,10 @@ pub fn episode(props: &EpisodeProps) -> Html {
     let show_modal = use_state(|| false);
     let show_clonedal = show_modal.clone();
     let show_clonedal2 = show_modal.clone();
-    let on_modal_open = Callback::from(move |_: MouseEvent| show_clonedal.set(true));
+    let on_modal_open = Callback::from(move |e: MouseEvent| {
+        e.prevent_default();
+        show_clonedal.set(true);
+    });
     let container_height = use_state(|| "221px".to_string());
 
     // This will track if we're showing the context menu from a long press
@@ -411,24 +428,6 @@ pub fn episode(props: &EpisodeProps) -> Html {
             }
         })
     };
-
-    // Setup long press detection
-    let (on_touch_start, on_touch_end, on_touch_move, is_long_press_state, is_pressing_state) =
-        use_long_press(on_long_press, Some(600)); // 600ms for long press
-
-    let is_long_press = is_long_press_state;
-    let is_pressing = is_pressing_state;
-
-    // When long press is detected through the hook, update our state
-    {
-        let show_context_menu = show_context_menu.clone();
-        use_effect_with(is_long_press, move |is_pressed| {
-            if *is_pressed {
-                show_context_menu.set(true);
-            }
-            || ()
-        });
-    }
 
     let on_modal_close = Callback::from(move |_: MouseEvent| show_clonedal2.set(false));
 
@@ -511,14 +510,14 @@ pub fn episode(props: &EpisodeProps) -> Html {
         props.episode.episodeartwork.clone(),
         props.episode.episodeduration.clone(),
         props.episode.episodeid.clone(),
-        props.episode.listenduration.clone(),
+        props.episode.listenduration.clone().unwrap_or_default(),
         api_key.unwrap().unwrap(),
         user_id.unwrap(),
         server_name.unwrap(),
         audio_dispatch.clone(),
         audio_state.clone(),
         None,
-        Some(props.episode.is_youtube.clone()),
+        props.episode.is_youtube,
     );
 
     let on_shownotes_click = {
@@ -531,7 +530,7 @@ pub fn episode(props: &EpisodeProps) -> Html {
             Some(props.page_type.clone()),
             true,
             None,
-            Some(props.episode.is_youtube.clone()),
+            props.episode.is_youtube,
         )
     };
 
@@ -541,45 +540,62 @@ pub fn episode(props: &EpisodeProps) -> Html {
         .unwrap_or(&vec![])
         .contains(&props.episode.episodeid);
 
-    // Close context menu callback
-    let close_context_menu = {
+    // // Close context menu callback
+    // let close_context_menu = {
+    //     let show_context_menu = show_context_menu.clone();
+    //     Callback::from(move |_| {
+    //         show_context_menu.set(false);
+    //     })
+    // };
+
+    // Setup long press detection
+    let (on_touch_start, on_touch_end, on_touch_move, is_long_press_state, is_pressing_state) =
+        use_long_press(on_long_press, Some(600)); // 600ms for long press
+
+    // When long press is detected through the hook, update our state
+    {
         let show_context_menu = show_context_menu.clone();
-        Callback::from(move |_| {
-            show_context_menu.set(false);
-        })
-    };
+        use_effect_with(is_long_press_state, move |is_pressed| {
+            if *is_pressed {
+                show_context_menu.set(true);
+            }
+            || ()
+        });
+    }
+    // todo:
+    // let item = virtual_episode_item(
+    //     Box::new(props.episode.clone()),
+    //     sanitize_html_with_blank_target(&props.episode.episodedescription),
+    //     desc_expanded,
+    //     &formatted_date,
+    //     on_play_pause,
+    //     on_shownotes_click,
+    //     toggle_expanded,
+    //     props.episode.episodeduration,
+    //     props.episode.listenduration,
+    //     &props.page_type,
+    //     Callback::from(|_| {}),
+    //     false,
+    //     props.episode.episodeurl.clone(),
+    //     is_completed,
+    //     *show_modal,
+    //     Callback::from(|_| {}),
+    //     on_modal_close.clone(),
+    //     (*container_height).clone(),
+    //     is_current_episode,
+    //     is_playing,
+    //     // Add new params for touch events
+    //     on_touch_start,
+    //     on_touch_end,
+    //     on_touch_move,
+    //     *show_context_menu,
+    //     *context_menu_position,
+    //     close_context_menu,
+    //     context_button_ref,
+    //     is_pressing_state,
+    // );
 
-    let item = virtual_episode_item(
-        Box::new(props.episode.clone()),
-        sanitize_html_with_blank_target(&props.episode.episodedescription),
-        desc_expanded,
-        &formatted_date,
-        on_play_pause,
-        on_shownotes_click,
-        toggle_expanded,
-        props.episode.episodeduration,
-        props.episode.listenduration,
-        &props.page_type,
-        Callback::from(|_| {}),
-        false,
-        props.episode.episodeurl.clone(),
-        is_completed,
-        *show_modal,
-        on_modal_open.clone(),
-        on_modal_close.clone(),
-        (*container_height).clone(),
-        is_current_episode,
-        is_playing,
-        // Add new params for touch events
-        on_touch_start,
-        on_touch_end,
-        on_touch_move,
-        *show_context_menu,
-        *context_menu_position,
-        close_context_menu,
-        context_button_ref,
-        is_pressing,
-    );
+    // item
 
-    item
+    html! {}
 }

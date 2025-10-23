@@ -1,7 +1,6 @@
 use crate::components::context::{AppState, UIState};
 use crate::components::gen_funcs::format_error_message;
 use crate::components::notification_center::ToastNotification;
-use i18nrs::yew::use_translation;
 use crate::requests::login_requests::{self, call_check_mfa_enabled};
 use crate::requests::login_requests::{
     call_first_login_done, call_get_time_info, call_self_service_login_status,
@@ -9,6 +8,7 @@ use crate::requests::login_requests::{
 };
 use crate::requests::setting_reqs::call_get_theme;
 use chrono_tz::{Tz, TZ_VARIANTS};
+use i18nrs::yew::use_translation;
 use md5;
 use rand::Rng;
 use wasm_bindgen::closure::Closure;
@@ -39,7 +39,9 @@ pub fn login() -> Html {
     let i18n_account_created_success = i18n.t("login.account_created_successfully").to_string();
     let i18n_error_creating_account = i18n.t("login.error_creating_account").to_string();
     let i18n_error_checking_mfa = i18n.t("login.error_checking_mfa_status").to_string();
-    let i18n_error_checking_first_login = i18n.t("login.error_checking_first_login_status").to_string();
+    let i18n_error_checking_first_login = i18n
+        .t("login.error_checking_first_login_status")
+        .to_string();
     let i18n_credentials_incorrect = i18n.t("login.credentials_incorrect").to_string();
     let i18n_error_setting_up_timezone = i18n.t("login.error_setting_up_timezone").to_string();
     let i18n_first_time_welcome = i18n.t("login.first_time_welcome").to_string();
@@ -72,7 +74,8 @@ pub fn login() -> Html {
     let i18n_error_validating_mfa = i18n.t("login.error_validating_mfa").to_string();
     let i18n_error_checking_mfa_status = i18n.t("login.error_checking_mfa_status").to_string();
     let i18n_error_setting_timezone = i18n.t("login.error_setting_timezone").to_string();
-    let i18n_error_setting_timezone_details = i18n.t("login.error_setting_timezone_details").to_string();
+    let i18n_error_setting_timezone_details =
+        i18n.t("login.error_setting_timezone_details").to_string();
     let i18n_language = i18n.t("common.language").to_string();
     let i18n_login = i18n.t("auth.login").to_string();
     let i18n_pinepods = i18n.t("common.pinepods").to_string();

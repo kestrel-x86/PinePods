@@ -2,6 +2,8 @@ use anyhow::Error;
 use gloo::net::http::Request;
 use serde::Deserialize;
 
+use crate::requests::pod_req::Episode;
+
 #[derive(Deserialize, Clone, PartialEq, Debug)]
 pub struct PersonSubscription {
     pub personid: i32,
@@ -130,7 +132,7 @@ pub struct PersonEpisode {
 
 #[derive(Deserialize)]
 pub struct PersonEpisodesResponse {
-    episodes: Vec<PersonEpisode>,
+    episodes: Vec<Episode>,
 }
 
 pub async fn call_get_person_episodes(
@@ -138,7 +140,7 @@ pub async fn call_get_person_episodes(
     api_key: &str,
     user_id: i32,
     person_id: i32,
-) -> Result<Vec<PersonEpisode>, Error> {
+) -> Result<Vec<Episode>, Error> {
     let url = format!(
         "{}/api/data/person/episodes/{}/{}",
         server_name, user_id, person_id

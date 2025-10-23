@@ -6,13 +6,14 @@ use crate::components::audio::on_play_pause;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState};
 use crate::components::episodes_layout::AppStateMsg;
-use i18nrs::yew::use_translation;
+use crate::components::gen_funcs::use_long_press;
 use crate::components::gen_funcs::{
     format_datetime, match_date_format, parse_date, sanitize_html_with_blank_target,
 };
 use crate::requests::search_pods::{call_search_database, SearchRequest, SearchResponse};
 use async_std::task::sleep;
 use gloo_events::EventListener;
+use i18nrs::yew::use_translation;
 use std::time::Duration;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::window;
@@ -204,6 +205,46 @@ pub fn search(_props: &SearchProps) -> Html {
     let go_text = i18n.t("search.go");
     let search_text = i18n.t("search.search");
 
+    // This will track if we're showing the context menu from a long press
+    let show_context_menu = use_state(|| false);
+    let context_menu_position = use_state(|| (0, 0));
+
+    // Long press handler - simulate clicking the context button
+    let context_button_ref = use_node_ref();
+    let on_long_press = {
+        let context_button_ref = context_button_ref.clone();
+        let show_context_menu = show_context_menu.clone();
+        let context_menu_position = context_menu_position.clone();
+
+        Callback::from(move |event: TouchEvent| {
+            if let Some(touch) = event.touches().get(0) {
+                // Record position for the context menu
+                context_menu_position.set((touch.client_x(), touch.client_y()));
+
+                // Find and click the context button (if it exists)
+                if let Some(button) = context_button_ref.cast::<web_sys::HtmlElement>() {
+                    button.click();
+                } else {
+                    // If the button doesn't exist (maybe on mobile where it's hidden)
+                    // we'll just set our state to show the menu
+                    show_context_menu.set(true);
+                }
+            }
+        })
+    };
+
+    // Close context menu callback
+    let close_context_menu = {
+        let show_context_menu = show_context_menu.clone();
+        Callback::from(move |_| {
+            show_context_menu.set(false);
+        })
+    };
+
+    // Setup long press detection
+    let (on_touch_start, on_touch_end, on_touch_move, _is_long_press_state, is_pressing) =
+        use_long_press(on_long_press, Some(600)); // 600ms for long press
+
     html! {
         <>
         <div class="search-page-container">
@@ -261,8 +302,7 @@ pub fn search(_props: &SearchProps) -> Html {
                                     let episode_artwork_clone = episode.episodeartwork.clone();
                                     let episode_duration_clone = episode.episodeduration.clone();
                                     let episode_id_clone = episode.episodeid.clone();
-                                    let episode_is_youtube = Some(episode.is_youtube.clone());
-                                    let episode_listened_clone = episode.listenduration.clone();
+                                    let episode_listened_clone = episode.listenduration.clone().unwrap_or_default();
                                     let history_clone = history.clone();
                                     let sanitized_description = sanitize_html_with_blank_target(&episode.episodedescription.clone());
                                     let is_current_episode = audio_state
@@ -313,14 +353,14 @@ pub fn search(_props: &SearchProps) -> Html {
                                         episode_artwork_for_closure.clone(),
                                         episode_duration_for_closure.clone(),
                                         episode_id_for_closure.clone(),
-                                        listener_duration_for_closure.clone(),
+                                        listener_duration_for_closure,
                                         api_key_play.unwrap().unwrap(),
                                         user_id_play.unwrap(),
                                         server_name_play.unwrap(),
                                         audio_dispatch.clone(),
                                         audio_state.clone(),
                                         None,
-                                        episode_is_youtube,
+                                        episode.is_youtube,
                                     );
 
                                     let on_shownotes_click = on_shownotes_click(
@@ -332,7 +372,7 @@ pub fn search(_props: &SearchProps) -> Html {
                                         Some(String::from("search")),
                                         true,
                                         None,
-                                        episode_is_youtube,
+                                        episode.is_youtube,
                                     );
 
                                     let episode_url_for_ep_item = episode_url_clone.clone();
@@ -345,7 +385,7 @@ pub fn search(_props: &SearchProps) -> Html {
                                     let episode_id_clone = Some(episode.episodeid).clone();
 
                                     let item = episode_item(
-                                        Box::new(episode),
+                                        episode,
                                         sanitized_description,
                                         is_expanded,
                                         &format_release,
@@ -365,6 +405,15 @@ pub fn search(_props: &SearchProps) -> Html {
                                         (*container_height).clone(),
                                         is_current_episode,
                                         is_playing,
+                                                // Add new params for touch events
+                                        on_touch_start.clone(),
+                                        on_touch_end.clone(),
+                                        on_touch_move.clone(),
+                                        *show_context_menu,
+                                        *context_menu_position,
+                                        close_context_menu.clone(),
+                                        context_button_ref.clone(),
+                                        *is_pressing,
                                     );
 
                                     item

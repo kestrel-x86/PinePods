@@ -17,6 +17,7 @@ pub(crate) mod saved;
 pub(crate) mod search;
 pub(crate) mod settings;
 pub(crate) mod user_stats;
+pub(crate) mod vepisode;
 pub(crate) mod virtual_list;
 pub(crate) mod youtube_layout;
 

@@ -114,7 +114,7 @@ pub fn create_on_title_click(
                                     Ok(mut podcast_feed_results) => {
                                         // Fix is_youtube field for all episodes based on the endpoint used
                                         for episode in &mut podcast_feed_results.episodes {
-                                            episode.is_youtube = Some(is_youtube);
+                                            episode.is_youtube = is_youtube;
                                         }
                                         dispatch.reduce_mut(move |state| {
                                             state.podcast_added = Some(true);

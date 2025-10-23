@@ -9,13 +9,13 @@ use crate::components::gen_components::on_shownotes_click;
 use crate::components::gen_components::ContextButton;
 use crate::components::gen_components::EpisodeTrait;
 use crate::components::gen_funcs::{format_datetime, format_time, match_date_format, parse_date};
-use crate::requests::pod_req;
+use crate::requests::pod_req::{self, Episode};
 use crate::requests::pod_req::{HomeEpisode, Playlist};
+use i18nrs::yew::use_translation;
 use yew::prelude::*;
 use yew_router::history::{BrowserHistory, History};
 use yew_router::prelude::Link;
 use yewdux::prelude::*;
-use i18nrs::yew::use_translation;
 
 #[derive(Properties, PartialEq, Clone)]
 struct QuickLinkProps {
@@ -386,7 +386,7 @@ pub fn home() -> Html {
 
 #[derive(Properties, PartialEq, Clone)]
 pub struct HomeEpisodeItemProps {
-    pub episode: HomeEpisode,
+    pub episode: Episode,
     pub page_type: String,
 }
 
@@ -399,8 +399,8 @@ pub fn home_episode_item(props: &HomeEpisodeItemProps) -> Html {
     let server_name = state.auth_details.as_ref().map(|ud| ud.server_name.clone());
     let history = BrowserHistory::new();
     let should_show_buttons = !props.episode.episodeurl.is_empty();
-    let episode: Box<dyn EpisodeTrait> = Box::new(props.episode.clone());
-    let listen_duration = props.episode.listenduration.unwrap_or(0);
+    let episode: Episode = props.episode.clone();
+    let listen_duration = props.episode.listenduration.clone().unwrap_or_default();
     let total_duration = props.episode.episodeduration;
 
     let completed = props.episode.completed
@@ -443,14 +443,14 @@ pub fn home_episode_item(props: &HomeEpisodeItemProps) -> Html {
         props.episode.episodeartwork.clone(),
         props.episode.episodeduration,
         props.episode.episodeid,
-        props.episode.listenduration,
+        props.episode.listenduration.clone().unwrap_or_default(),
         api_key.unwrap().unwrap(),
         user_id.unwrap(),
         server_name.unwrap(),
         audio_dispatch.clone(),
         audio_state.clone(),
         None,
-        Some(props.episode.is_youtube.clone()),
+        props.episode.is_youtube,
     );
 
     let on_shownotes_click = {
@@ -463,7 +463,7 @@ pub fn home_episode_item(props: &HomeEpisodeItemProps) -> Html {
             Some(props.page_type.clone()),
             true,
             None,
-            Some(props.episode.is_youtube.clone()),
+            props.episode.is_youtube,
         )
     };
 

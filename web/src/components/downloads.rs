@@ -11,9 +11,10 @@ use crate::components::gen_funcs::{
 };
 use crate::requests::pod_req::{
     call_bulk_delete_downloaded_episodes, call_get_episode_downloads, call_get_podcasts,
-    BulkEpisodeActionRequest, DownloadEpisodeRequest, EpisodeDownload, EpisodeDownloadResponse,
-    Podcast, PodcastResponse,
+    BulkEpisodeActionRequest, DownloadEpisodeRequest, Episode, EpisodeDownload,
+    EpisodeDownloadResponse, Podcast, PodcastResponse,
 };
+use i18nrs::yew::use_translation;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -22,10 +23,9 @@ use yew::prelude::*;
 use yew::{function_component, html, Html};
 use yew_router::history::BrowserHistory;
 use yewdux::prelude::*;
-use i18nrs::yew::use_translation;
 
-fn group_episodes_by_podcast(episodes: Vec<EpisodeDownload>) -> HashMap<i32, Vec<EpisodeDownload>> {
-    let mut grouped: HashMap<i32, Vec<EpisodeDownload>> = HashMap::new();
+fn group_episodes_by_podcast(episodes: Vec<Episode>) -> HashMap<i32, Vec<Episode>> {
+    let mut grouped: HashMap<i32, Vec<Episode>> = HashMap::new();
     for episode in episodes {
         grouped
             .entry(episode.podcastid)
@@ -51,10 +51,15 @@ pub fn downloads() -> Html {
     let i18n_clear_all = i18n.t("downloads.clear_all").to_string();
     let i18n_completed = i18n.t("downloads.completed").to_string();
     let i18n_in_progress = i18n.t("downloads.in_progress").to_string();
-    let i18n_search_downloaded_episodes = i18n.t("downloads.search_downloaded_episodes").to_string();
-    let i18n_no_downloaded_episodes_found = i18n.t("downloads.no_downloaded_episodes_found").to_string();
-    let i18n_no_downloaded_episodes_description = i18n.t("downloads.no_downloaded_episodes_description").to_string();
-    let i18n_no_episode_downloads_found = i18n.t("downloads.no_episode_downloads_found").to_string();
+    let i18n_search_downloaded_episodes =
+        i18n.t("downloads.search_downloaded_episodes").to_string();
+    let i18n_no_downloaded_episodes_found =
+        i18n.t("downloads.no_downloaded_episodes_found").to_string();
+    let i18n_no_downloaded_episodes_description = i18n
+        .t("downloads.no_downloaded_episodes_description")
+        .to_string();
+    let i18n_no_episode_downloads_found =
+        i18n.t("downloads.no_episode_downloads_found").to_string();
     let i18n_downloaded_episodes_count = i18n.t("downloads.downloaded_episodes_count").to_string();
 
     // Filter state for episodes
@@ -221,8 +226,12 @@ pub fn downloads() -> Html {
             let user_id_cloned = user_id.unwrap();
 
             dispatch.reduce_mut(move |state| {
-                let selected_episodes: Vec<i32> = state.selected_episodes_for_deletion.iter().cloned().collect();
-                let is_youtube = state.selected_is_youtube.unwrap_or(false);
+                let selected_episodes: Vec<i32> = state
+                    .selected_episodes_for_deletion
+                    .iter()
+                    .cloned()
+                    .collect();
+                let is_youtube = state.selected_is_youtube;
                 
                 // Clear the selected episodes for deletion right away to prevent re-deletion
                 state.selected_episodes_for_deletion.clear();
@@ -246,7 +255,9 @@ pub fn downloads() -> Html {
                             Ok(success_message) => {
                                 dispatch_for_future.reduce_mut(|state| {
                                     // Remove deleted episodes from the state
-                                    if let Some(downloaded_episodes) = &mut state.downloaded_episodes {
+                                    if let Some(downloaded_episodes) =
+                                        &mut state.downloaded_episodes
+                                    {
                                         downloaded_episodes.episodes.retain(|ep| {
                                             !selected_episodes.contains(&ep.episodeid)
                                         });
@@ -256,7 +267,8 @@ pub fn downloads() -> Html {
                             }
                             Err(e) => {
                                 dispatch_for_future.reduce_mut(|state| {
-                                    state.error_message = Some(format!("Failed to delete episodes: {}", e));
+                                    state.error_message =
+                                        Some(format!("Failed to delete episodes: {}", e));
                                 });
                             }
                         }
@@ -443,10 +455,10 @@ pub fn downloads() -> Html {
 
                                 // Create filtered episodes
                                 let filtered_grouped_episodes = {
-                                    let mut filtered_map: HashMap<i32, Vec<EpisodeDownload>> = HashMap::new();
+                                    let mut filtered_map: HashMap<i32, Vec<Episode>> = HashMap::new();
 
                                     for (podcast_id, episodes) in grouped_episodes.iter() {
-                                        let filtered_episodes: Vec<EpisodeDownload> = episodes.iter()
+                                        let filtered_episodes: Vec<Episode> = episodes.iter()
                                             .filter(|episode| {
                                                 // Search filter
                                                 let matches_search = if !episode_search_term.is_empty() {
@@ -461,7 +473,7 @@ pub fn downloads() -> Html {
                                                 } else if *show_completed {
                                                     episode.completed
                                                 } else if *show_in_progress {
-                                                    !episode.completed && episode.listenduration.is_some() && episode.listenduration.unwrap() > 0
+                                                    !episode.completed && episode.listenduration.unwrap_or_default() > 0
                                                 } else {
                                                     true // No filters = show all
                                                 };
@@ -548,7 +560,7 @@ pub fn downloads() -> Html {
 
 pub fn render_podcast_with_episodes(
     podcast: &Podcast,
-    episodes: Vec<EpisodeDownload>,
+    episodes: Vec<Episode>,
     downloaded_episode_count: usize,
     is_expanded: bool,
     toggle_pod_expanded: Callback<MouseEvent>,
@@ -650,7 +662,7 @@ pub fn render_podcast_with_episodes(
                                 let episode_duration_clone = episode.episodeduration.clone();
                                 let episode_id_clone = episode.episodeid.clone();
                                 let episode_listened_clone = episode.listenduration.clone();
-                                let episode_is_youtube = Some(episode.is_youtube.clone());
+                                let episode_is_youtube = episode.is_youtube.clone();
                                 let _completed = episode.completed;
                                 let desc_expanded = desc_rc.expanded_descriptions.contains(id_string);
                                 #[wasm_bindgen]
@@ -707,7 +719,7 @@ pub fn render_podcast_with_episodes(
                                     episode_artwork_for_closure.clone(),
                                     episode_duration_for_closure.clone(),
                                     episode_id_for_closure.clone(),
-                                    listener_duration_for_closure.clone(),
+                                    listener_duration_for_closure.clone().unwrap_or_default(),
                                     api_key_play.unwrap().unwrap(),
                                     user_id_play.unwrap(),
                                     server_name_play.unwrap(),
@@ -740,8 +752,9 @@ pub fn render_podcast_with_episodes(
                                     .as_ref()
                                     .unwrap_or(&vec![])
                                     .contains(&check_episode_id);
+
                                 download_episode_item(
-                                    Box::new(episode),
+                                    episode,
                                     sanitized_description.clone(),
                                     desc_expanded,
                                     &format_release,
@@ -749,7 +762,7 @@ pub fn render_podcast_with_episodes(
                                     on_shownotes_click,
                                     toggle_expanded,
                                     episode_duration_clone,
-                                    episode_listened_clone,
+                                    episode_listened_clone.unwrap_or_default(),
                                     "downloads",
                                     on_checkbox_change_cloned, // Add this line
                                     is_delete_mode, // Add this line

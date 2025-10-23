@@ -1,20 +1,19 @@
 use super::app_drawer::App_drawer;
 use super::gen_components::{
-    empty_message, on_shownotes_click, use_long_press, virtual_episode_item, Search_nav,
-    UseScrollToTop,
+    empty_message, on_shownotes_click, use_long_press, Search_nav, UseScrollToTop,
 };
 use crate::components::audio::on_play_pause;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
 use crate::components::episodes_layout::AppStateMsg;
-use i18nrs::yew::use_translation;
 use crate::components::gen_funcs::{
-    format_datetime, match_date_format, parse_date, sanitize_html_with_blank_target,
-    get_filter_preference, set_filter_preference, get_default_sort_direction,
+    format_datetime, get_default_sort_direction, get_filter_preference, match_date_format,
+    parse_date, sanitize_html_with_blank_target, set_filter_preference,
 };
 use crate::requests::pod_req;
 use crate::requests::pod_req::SavedEpisodesResponse;
 use gloo::events::EventListener;
+use i18nrs::yew::use_translation;
 use wasm_bindgen::JsCast;
 use web_sys::window;
 use web_sys::{Element, HtmlElement};
@@ -181,7 +180,8 @@ pub fn saved() -> Html {
                         let matches_status = if **show_completed {
                             episode.completed
                         } else if **show_in_progress {
-                            episode.listenduration.is_some() && !episode.completed
+                            episode.listenduration.clone().unwrap_or_default() > 0
+                                && !episode.completed
                         } else {
                             true // Show all if no filter is active
                         };
@@ -400,7 +400,7 @@ pub fn saved() -> Html {
 
 #[derive(Properties, PartialEq)]
 pub struct VirtualListProps {
-    pub episodes: Vec<pod_req::SavedEpisode>,
+    pub episodes: Vec<pod_req::Episode>,
     pub page_type: String,
 }
 
@@ -477,12 +477,17 @@ pub fn virtual_list(props: &VirtualListProps) -> Html {
                                 // Use requestAnimationFrame to batch updates and prevent feedback
                                 let scroll_pos_clone2 = scroll_pos_clone.clone();
                                 let is_updating_clone = is_updating.clone();
-                                let callback = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
+                                let callback =
+                                    wasm_bindgen::closure::Closure::wrap(Box::new(move || {
                                     scroll_pos_clone2.set(new_scroll_top);
                                     *is_updating_clone.borrow_mut() = false;
-                                }) as Box<dyn FnMut()>);
+                                    })
+                                        as Box<dyn FnMut()>);
                                 
-                                web_sys::window().unwrap().request_animation_frame(callback.as_ref().unchecked_ref()).unwrap();
+                                web_sys::window()
+                                    .unwrap()
+                                    .request_animation_frame(callback.as_ref().unchecked_ref())
+                                    .unwrap();
                                 callback.forget();
                             }
                         }
@@ -550,7 +555,7 @@ extern "C" {
 
 #[derive(Properties, PartialEq, Clone)]
 pub struct SavedEpisodeProps {
-    pub episode: pod_req::SavedEpisode,
+    pub episode: pod_req::Episode,
     pub page_type: String,
 }
 
@@ -568,7 +573,7 @@ pub fn saved_episode(props: &SavedEpisodeProps) -> Html {
     let show_modal = use_state(|| false);
     let show_clonedal = show_modal.clone();
     let show_clonedal2 = show_modal.clone();
-    let on_modal_open = Callback::from(move |_: MouseEvent| show_clonedal.set(true));
+    let on_modal_open = Callback::from(move |_: i32| show_clonedal.set(true));
     let on_modal_close = Callback::from(move |_: MouseEvent| show_clonedal2.set(false));
     let container_height = use_state(|| "221px".to_string());
 
@@ -698,14 +703,14 @@ pub fn saved_episode(props: &SavedEpisodeProps) -> Html {
         props.episode.episodeartwork.clone(),
         props.episode.episodeduration.clone(),
         props.episode.episodeid.clone(),
-        props.episode.listenduration.clone(),
+        props.episode.listenduration.clone().unwrap_or_default(),
         api_key.unwrap().unwrap(),
         user_id.unwrap(),
         server_name.unwrap(),
         audio_dispatch.clone(),
         audio_state.clone(),
         None,
-        Some(props.episode.is_youtube.clone()),
+        props.episode.is_youtube,
     );
 
     let on_shownotes_click = {
@@ -718,7 +723,7 @@ pub fn saved_episode(props: &SavedEpisodeProps) -> Html {
             Some(props.page_type.clone()),
             true,
             None,
-            Some(props.episode.is_youtube.clone()),
+            props.episode.is_youtube,
         )
     };
 
@@ -729,44 +734,44 @@ pub fn saved_episode(props: &SavedEpisodeProps) -> Html {
         .contains(&props.episode.episodeid);
 
     // Close context menu callback
-    let close_context_menu = {
-        let show_context_menu = show_context_menu.clone();
-        Callback::from(move |_| {
-            show_context_menu.set(false);
-        })
-    };
+    // let close_context_menu = {
+    //     let show_context_menu = show_context_menu.clone();
+    //     Callback::from(move |_| {
+    //         show_context_menu.set(false);
+    //     })
+    // };
+    html! {}
+    // let item = virtual_episode_item(
+    //     Box::new(props.episode.clone()),
+    //     sanitize_html_with_blank_target(&props.episode.episodedescription),
+    //     desc_expanded,
+    //     &formatted_date,
+    //     on_play_pause,
+    //     on_shownotes_click,
+    //     toggle_expanded,
+    //     props.episode.episodeduration,
+    //     props.episode.listenduration,
+    //     &props.page_type,
+    //     Callback::from(|_| {}),
+    //     false,
+    //     props.episode.episodeurl.clone(),
+    //     is_completed,
+    //     *show_modal,
+    //     on_modal_open.clone(),
+    //     on_modal_close.clone(),
+    //     (*container_height).clone(),
+    //     is_current_episode,
+    //     is_playing,
+    //     // Add new params for touch events
+    //     on_touch_start,
+    //     on_touch_end,
+    //     on_touch_move,
+    //     *show_context_menu,
+    //     *context_menu_position,
+    //     close_context_menu,
+    //     context_button_ref,
+    //     is_pressing,
+    // );
 
-    let item = virtual_episode_item(
-        Box::new(props.episode.clone()),
-        sanitize_html_with_blank_target(&props.episode.episodedescription),
-        desc_expanded,
-        &formatted_date,
-        on_play_pause,
-        on_shownotes_click,
-        toggle_expanded,
-        props.episode.episodeduration,
-        props.episode.listenduration,
-        &props.page_type,
-        Callback::from(|_| {}),
-        false,
-        props.episode.episodeurl.clone(),
-        is_completed,
-        *show_modal,
-        on_modal_open.clone(),
-        on_modal_close.clone(),
-        (*container_height).clone(),
-        is_current_episode,
-        is_playing,
-        // Add new params for touch events
-        on_touch_start,
-        on_touch_end,
-        on_touch_move,
-        *show_context_menu,
-        *context_menu_position,
-        close_context_menu,
-        context_button_ref,
-        is_pressing,
-    );
-
-    item
+    // item
 }

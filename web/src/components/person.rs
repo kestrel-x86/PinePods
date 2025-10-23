@@ -1,7 +1,6 @@
 use super::app_drawer::App_drawer;
 use crate::components::audio::on_play_pause;
 use crate::components::audio::AudioPlayer;
-use i18nrs::yew::use_translation;
 use crate::components::click_events::create_on_title_click;
 use crate::components::context::ExpandedDescriptions;
 use crate::components::context::{AppState, UIState};
@@ -22,6 +21,7 @@ use crate::requests::pod_req::{
     RemovePodcastValuesName,
 };
 use base64::{engine::general_purpose, Engine as _};
+use i18nrs::yew::use_translation;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -163,7 +163,9 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                                 let mut found_subscription = false;
 
                                 for sub in subs {
-                                    let associated_podcasts = sub.associatedpodcasts.to_string()
+                                    let associated_podcasts = sub
+                                        .associatedpodcasts
+                                        .to_string()
                                         .split(',')
                                         .filter_map(|s| s.parse::<i32>().ok())
                                         .collect::<Vec<i32>>();
@@ -256,8 +258,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                                 new_set.remove(&podcast_id);
                                 added_podcasts_callback.set(new_set);
                                 dispatch_callback.reduce_mut(|state| {
-                                    state.info_message =
-                                        Some(i18n_podcast_removed.clone());
+                                    state.info_message = Some(i18n_podcast_removed.clone());
                                     state.is_loading = Some(false);
                                 });
                             }
@@ -325,8 +326,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                                             }
                                         }
                                     }
-                                    state.info_message =
-                                        Some(i18n_podcast_added.clone());
+                                    state.info_message = Some(i18n_podcast_added.clone());
                                     state.is_loading = Some(false);
                                 });
                                 let mut new_set = (*added_podcasts_callback).clone();
@@ -892,14 +892,14 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                                             episode_artwork_clone.clone(),
                                             episode_duration_clone,
                                             episode_id_clone.clone(),
-                                            Some(0),
+                                            0,
                                             api_key_play.unwrap().unwrap(),
                                             user_id_play.unwrap(),
                                             server_name_play.unwrap(),
                                             dispatch.clone(),
                                             audio_state.clone(),
                                             None,
-                                            Some(false),
+                                            false,
                                         );
 
                                         let description_class = if is_expanded {
@@ -920,7 +920,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                                                     class="episode-image"/>
                                                 <div class="flex flex-col p-4 space-y-2 flex-grow md:w-7/12">
                                                     <p class="item_container-text episode-title font-semibold"
-                                                    onclick={on_shownotes_click(history_clone.clone(), search_dispatch.clone(), Some(episode_id_for_ep_item), Some(podcast_link_clone), Some(shownotes_episode_url), Some(podcast_title), db_added, None, Some(false))}
+                                                    onclick={on_shownotes_click(history_clone.clone(), search_dispatch.clone(), Some(episode_id_for_ep_item), Some(podcast_link_clone), Some(shownotes_episode_url), Some(podcast_title), db_added, None, false)}
                                                     >{ &episode.title.clone().unwrap_or_default() }</p>
                                                     // <p class="text-gray-600">{ &episode.description.clone().unwrap_or_default() }</p>
                                                     {
