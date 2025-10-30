@@ -367,8 +367,7 @@ pub fn login() -> Html {
     let submit_post_state = dispatch.clone();
     let on_submit = {
         let submit_dispatch = dispatch.clone();
-        let i18n_error_checking_first_login = i18n_error_checking_first_login.clone();
-        let i18n_credentials_incorrect = i18n_credentials_incorrect.clone();
+        let i18n_error_checking_mfa_status_clone = i18n_error_checking_mfa_status.clone();
         Callback::from(move |_| {
             let i18n_error_checking_first_login = i18n_error_checking_first_login.clone();
             let i18n_credentials_incorrect = i18n_credentials_incorrect.clone();
@@ -382,6 +381,9 @@ pub fn login() -> Html {
             let temp_server_name = call_server_name.clone();
             let temp_api_key = call_api_key.clone();
             let temp_user_id = call_user_id.clone();
+
+            let i18n_error_checking_mfa_status_clone = i18n_error_checking_mfa_status_clone.clone();
+            let i18n_error_checking_first_login_clone = i18n_error_checking_first_login.clone();
             wasm_bindgen_futures::spawn_local(async move {
                 // let server_name = location.href().expect("should have a href");
                 let server_name = server_name.clone();
@@ -494,7 +496,7 @@ pub fn login() -> Html {
                                         Err(_) => {
                                             post_state.reduce_mut(|state| {
                                                 state.error_message = Option::from(
-                                                    i18n_error_checking_mfa_status.clone(),
+                                                    i18n_error_checking_mfa_status_clone,
                                                 )
                                             });
                                         }
@@ -505,9 +507,8 @@ pub fn login() -> Html {
                             }
                             Err(_) => {
                                 post_state.reduce_mut(|state| {
-                                    state.error_message = Option::from(
-                                        i18n_error_checking_first_login.clone(),
-                                    )
+                                    state.error_message =
+                                        Option::from(i18n_error_checking_first_login_clone)
                                 });
                             }
                         }
@@ -618,6 +619,8 @@ pub fn login() -> Html {
         let history = history.clone();
         // let error_message_create = error_message.clone();
         Callback::from(move |e: MouseEvent| {
+            let i18n_error_checking_mfa_status_clone = i18n_error_checking_mfa_status.clone();
+            let i18n_error_setting_timezone_clone = i18n_error_setting_timezone.clone();
             let post_state = dispatch_time.clone();
             e.prevent_default();
             let server_name = (*temp_server_name).clone();
@@ -661,14 +664,14 @@ pub fn login() -> Html {
                                 Err(_) => {
                                     post_state.reduce_mut(|state| {
                                         state.error_message =
-                                            Option::from(i18n_error_checking_mfa_status.clone())
+                                            Option::from(i18n_error_checking_mfa_status_clone)
                                     });
                                 }
                             }
                         } else {
                             post_state.reduce_mut(|state| {
                                 state.error_message =
-                                    Option::from(i18n_error_setting_timezone.clone())
+                                    Option::from(i18n_error_setting_timezone_clone)
                             });
                             page_state.set(PageState::Default);
                         }
@@ -779,6 +782,9 @@ pub fn login() -> Html {
             let history = history.clone();
             let post_state = post_state.clone();
             // let error_message_clone = error_message_create.clone();
+            let i18n_error_validating_mfa_clone = i18n_error_validating_mfa.clone();
+            let i18n_error_setting_timezone_details_clone =
+                i18n_error_setting_timezone_details.clone();
             e.prevent_default();
 
             wasm_bindgen_futures::spawn_local(async move {
@@ -844,8 +850,7 @@ pub fn login() -> Html {
                         } else {
                             page_state.set(PageState::Default);
                             post_state.reduce_mut(|state| {
-                                state.error_message =
-                                    Option::from(i18n_error_validating_mfa.clone())
+                                state.error_message = Option::from(i18n_error_validating_mfa_clone)
                             });
                         }
                     }
@@ -855,8 +860,7 @@ pub fn login() -> Html {
                         post_state.reduce_mut(|state| {
                             state.error_message = Option::from(format!(
                                 "{}: {:?}",
-                                i18n_error_setting_timezone_details.clone(),
-                                formatted_error
+                                i18n_error_setting_timezone_details_clone, formatted_error
                             ))
                         });
                     }

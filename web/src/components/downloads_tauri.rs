@@ -480,6 +480,9 @@ pub fn downloads() -> Html {
             let dispatch_cloned = dispatch.clone();
             let page_state_cloned = page_state.clone();
 
+            let i18n_successfully_deleted_episodes = i18n_successfully_deleted_episodes.clone();
+            let i18n_failed_to_delete_episodes = i18n_failed_to_delete_episodes.clone();
+
             dispatch.reduce_mut(move |state| {
                 let selected_episodes = state.selected_episodes_for_deletion.clone();
                 state.selected_episodes_for_deletion.clear();
@@ -611,13 +614,7 @@ pub fn downloads() -> Html {
 
         if let Some(podcast_feed) = state.podcast_feed_return.as_ref() {
             if let Some(pods) = podcast_feed.pods.as_ref() {
-                web_sys::console::log_1(
-                    &format!(
-                        "Podcast IDs in feed: {:?}",
-                        pods.iter().map(|p| p.podcastid).collect::<Vec<_>>()
-                    )
-                    .into(),
-                );
+                web_sys::console::log_1(&format!("Podcast IDs in feed: {:?}", pods.iter().map(|p| p.podcastid).collect::<Vec<_>>()).into());
 
                 // Check matches
                 for podcast in pods.iter() {
@@ -695,7 +692,7 @@ pub fn downloads() -> Html {
                                             <input
                                                 type="text"
                                                 class="search-input"
-                                                placeholder={&i18n_search_downloaded_episodes}
+                                                placeholder={i18n_search_downloaded_episodes}
                                                 value={(*episode_search_term).clone()}
                                                 oninput={let episode_search_term = episode_search_term.clone();
                                                     Callback::from(move |e: InputEvent| {

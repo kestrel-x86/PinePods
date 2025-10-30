@@ -45,6 +45,7 @@ pub fn login() -> Html {
     // Pre-capture translation strings for use in closures and async blocks
     let i18n_error_checking_status = i18n.t("login.error_checking_status").to_string();
     let i18n_error_fetching_oidc = i18n.t("login.error_fetching_oidc_providers").to_string();
+    let i18n_error_fetching_languages = i18n.t("login.error_fetching_languages").to_string();
     let i18n_account_created_success = i18n.t("login.account_created_successfully").to_string();
     let i18n_error_creating_account = i18n.t("login.error_creating_account").to_string();
     let i18n_error_checking_mfa = i18n.t("login.error_checking_mfa_status").to_string();
@@ -53,6 +54,8 @@ pub fn login() -> Html {
         .to_string();
     let i18n_credentials_incorrect = i18n.t("login.credentials_incorrect").to_string();
     let i18n_error_setting_up_timezone = i18n.t("login.error_setting_up_timezone").to_string();
+    let i18n_first_time_welcome = i18n.t("login.first_time_welcome").to_string();
+    let i18n_mfa_welcome = i18n.t("login.mfa_welcome").to_string();
     let i18n_forgot_password = i18n.t("login.forgot_password").to_string();
     let i18n_reset_instructions = i18n.t("login.reset_password_instructions").to_string();
     let i18n_fill_password_fields = i18n.t("login.fill_password_fields").to_string();
@@ -73,9 +76,12 @@ pub fn login() -> Html {
     let i18n_mfa_login = i18n.t("login.mfa_login").to_string();
     let i18n_or_continue_with = i18n.t("login.or_continue_with").to_string();
     let i18n_connect_different_server = i18n.t("login.connect_different_server").to_string();
+    let i18n_connect_local_server = i18n.t("login.connect_local_server").to_string();
     let i18n_admin_created_success = i18n.t("login.admin_created_success").to_string();
+    let i18n_error_parsing_time = i18n.t("login.error_parsing_time").to_string();
     let i18n_language_updated = i18n.t("login.language_updated").to_string();
     let i18n_error_setup_timezone = i18n.t("login.error_setup_timezone").to_string();
+    let i18n_error_validating_mfa = i18n.t("login.error_validating_mfa").to_string();
     let i18n_language = i18n.t("common.language").to_string();
     let i18n_login = i18n.t("auth.login").to_string();
     let i18n_pinepods = i18n.t("common.pinepods").to_string();
