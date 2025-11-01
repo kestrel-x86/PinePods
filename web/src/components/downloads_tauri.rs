@@ -1,35 +1,26 @@
 use super::app_drawer::App_drawer;
-use super::gen_components::{
-    download_episode_item, empty_message, on_shownotes_click, FallbackImage, Search_nav,
-    UseScrollToTop,
-};
-use crate::components::audio::_AudioPlayerProps::is_youtube;
-use crate::components::audio::on_play_pause_offline;
+use super::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
-use crate::components::gen_funcs::{
-    format_datetime, match_date_format, parse_date, sanitize_html_with_blank_target,
-};
+
+use crate::components::episode_list_item::EpisodeListItem;
 use crate::requests::pod_req::{
-    EpisodeDownload, EpisodeDownloadResponse, EpisodeInfo, Podcast, PodcastDetails, PodcastResponse,
+    Episode, EpisodeDownloadResponse, EpisodeInfo, Podcast, PodcastDetails, PodcastResponse,
 };
+use i18nrs::yew::use_translation;
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::rc::Rc;
-use wasm_bindgen::closure::Closure;
-use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
-use web_sys::window;
 use yew::prelude::*;
 use yew::{function_component, html, Html};
 use yew_router::history::{BrowserHistory, History};
 use yewdux::prelude::*;
-use i18nrs::yew::use_translation;
 
-fn group_episodes_by_podcast(episodes: Vec<EpisodeDownload>) -> HashMap<i32, Vec<EpisodeDownload>> {
-    let mut grouped: HashMap<i32, Vec<EpisodeDownload>> = HashMap::new();
+fn group_episodes_by_podcast(episodes: Vec<Episode>) -> HashMap<i32, Vec<Episode>> {
+    let mut grouped: HashMap<i32, Vec<Episode>> = HashMap::new();
     for episode in episodes {
         grouped
             .entry(episode.podcastid)
@@ -214,7 +205,7 @@ pub async fn remove_multiple_episodes_from_local_db(episode_ids: Vec<i32>) -> Re
     Ok(())
 }
 
-pub async fn fetch_local_episodes() -> Result<Vec<EpisodeDownload>, JsValue> {
+pub async fn fetch_local_episodes() -> Result<Vec<Episode>, JsValue> {
     // Get window object
     let window = web_sys::window().ok_or_else(|| JsValue::from_str("No window object found"))?;
 
@@ -239,7 +230,7 @@ pub async fn fetch_local_episodes() -> Result<Vec<EpisodeDownload>, JsValue> {
     let result =
         wasm_bindgen_futures::JsFuture::from(promise.dyn_into::<js_sys::Promise>()?).await?;
 
-    match serde_wasm_bindgen::from_value::<Vec<EpisodeDownload>>(result) {
+    match serde_wasm_bindgen::from_value::<Vec<Episode>>(result) {
         Ok(episodes) => Ok(episodes),
         Err(_) => Ok(Vec::new()),
     }
@@ -353,7 +344,7 @@ pub fn downloads() -> Html {
     let show_modal = use_state(|| false);
     let show_clonedal = show_modal.clone();
     let show_clonedal2 = show_modal.clone();
-    let on_modal_open = Callback::from(move |_: MouseEvent| show_clonedal.set(true));
+    let on_modal_open = Callback::from(move |_: i32| show_clonedal.set(true));
 
     let on_modal_close = Callback::from(move |_: MouseEvent| show_clonedal2.set(false));
 
@@ -419,7 +410,7 @@ pub fn downloads() -> Html {
                 if let Ok(fetched_episodes) = fetch_local_episodes().await {
                     let completed_episode_ids: Vec<i32> = fetched_episodes
                         .iter()
-                        .filter(|ep| ep.listenduration.is_some())
+                        .filter(|ep| ep.listenduration > 0)
                         .map(|ep| ep.episodeid)
                         .collect();
                     dispatch.reduce_mut(move |state| {
@@ -796,10 +787,10 @@ pub fn downloads() -> Html {
 
                                 // Create filtered episodes
                                 let filtered_grouped_episodes = {
-                                    let mut filtered_map: HashMap<i32, Vec<EpisodeDownload>> = HashMap::new();
+                                    let mut filtered_map: HashMap<i32, Vec<Episode>> = HashMap::new();
 
                                     for (podcast_id, episodes) in grouped_episodes.iter() {
-                                        let filtered_episodes: Vec<EpisodeDownload> = episodes.iter()
+                                        let filtered_episodes: Vec<Episode> = episodes.iter()
                                             .filter(|episode| {
                                                 // Search filter
                                                 let matches_search = if !episode_search_term.is_empty() {
@@ -814,7 +805,7 @@ pub fn downloads() -> Html {
                                                 } else if *show_completed {
                                                     episode.completed
                                                 } else if *show_in_progress {
-                                                    !episode.completed && episode.listenduration.is_some() && episode.listenduration.unwrap() > 0
+                                                    !episode.completed && episode.listenduration > 0
                                                 } else {
                                                     true // No filters = show all
                                                 };
@@ -920,7 +911,7 @@ pub fn downloads() -> Html {
 
 pub fn render_podcast_with_episodes(
     podcast: &Podcast,
-    episodes: Vec<EpisodeDownload>,
+    episodes: Vec<Episode>,
     is_expanded: bool,
     toggle_expanded: Callback<MouseEvent>,
     state: Rc<AppState>,
@@ -932,7 +923,7 @@ pub fn render_podcast_with_episodes(
     audio_state: Rc<UIState>,
     on_checkbox_change: Callback<i32>,
     show_modal: bool,
-    on_modal_open: Callback<MouseEvent>,
+    on_modal_open: Callback<i32>,
     on_modal_close: Callback<MouseEvent>,
     i18n_downloaded_episodes_count: &str,
 ) -> Html {
@@ -1011,104 +1002,20 @@ pub fn render_podcast_with_episodes(
                 html! {
                     <div class="podcast-episodes-container expanded">
                         <div class="podcast-episodes-inner">
-                            { for episodes.into_iter().map(|episode| {
-                            let id_string = &episode.episodeid.to_string();
+                            {
+                                for episodes.into_iter().map(|episode| {
+                                    let on_checkbox_change_cloned = on_checkbox_change.clone();
 
-                            let app_dispatch = html_dispatch.clone();
-
-                            let episode_url_clone = episode.episodeurl.clone();
-                            let episode_duration_clone = episode.episodeduration.clone();
-                            let episode_id_clone = episode.episodeid.clone();
-                            let episode_listened_clone = episode.listenduration.clone();
-                            let episode_is_youtube = Some(episode.is_youtube.clone());
-                            let desc_expanded = desc_rc.expanded_descriptions.contains(id_string);
-
-                            #[wasm_bindgen]
-                            extern "C" {
-                                #[wasm_bindgen(js_namespace = window)]
-                                fn toggleDescription(guid: &str, expanded: bool);
-                            }
-                            let toggle_expanded = {
-                                let desc_dispatch = desc_state.clone();
-                                let episode_guid = episode.episodeid.clone().to_string();
-
-                                Callback::from(move |_: MouseEvent| {
-                                    let guid = episode_guid.clone();
-                                    desc_dispatch.reduce_mut(move |state| {
-                                        if state.expanded_descriptions.contains(&guid) {
-                                            state.expanded_descriptions.remove(&guid); // Collapse the description
-                                            toggleDescription(&guid, false); // Call JavaScript function
-                                        } else {
-                                            state.expanded_descriptions.insert(guid.clone()); // Expand the description
-                                            toggleDescription(&guid, true); // Call JavaScript function
-                                        }
-                                    });
+                                    html!{
+                                        <EpisodeListItem
+                                            episode={ episode }
+                                            page_type={ "local_downloads" }
+                                            on_checkbox_change={ on_checkbox_change_cloned }
+                                            is_delete_mode={ is_delete_mode }
+                                        />
+                                    }
                                 })
-                            };
-
-                            let episode_id_for_closure = episode_id_clone.clone();
-                            let audio_dispatch = audio_dispatch.clone();
-                            let audio_state = audio_state.clone();
-
-                            let is_current_episode = audio_state
-                                                            .currently_playing
-                                                            .as_ref()
-                                                            .map_or(false, |current| current.episode_id == episode.episodeid);
-                            let is_playing = audio_state.audio_playing.unwrap_or(false);
-
-                            let date_format = match_date_format(state.date_format.as_deref());
-                            let datetime = parse_date(&episode.episodepubdate, &state.user_tz);
-                            let format_release = format!("{}", format_datetime(&datetime, &state.hour_preference, date_format));
-
-
-                            let on_play_pause = on_play_pause_offline(episode.clone(), audio_dispatch, audio_state, app_dispatch.clone());
-
-                            let on_shownotes_click = on_shownotes_click(
-                                history_clone.clone(),
-                                app_dispatch.clone(),
-                                Some(episode_id_for_closure.clone()),
-                                Some(String::from("Not needed")),
-                                Some(String::from("Not needed")),
-                                Some(String::from("Not needed")),
-                                true,
-                                None,
-                                episode_is_youtube,
-                            );
-
-                            let on_checkbox_change_cloned = on_checkbox_change.clone();
-                            let episode_url_for_ep_item = episode_url_clone.clone();
-                            let sanitized_description =
-                                sanitize_html_with_blank_target(&episode.episodedescription.clone());
-
-                            let check_episode_id = &episode.episodeid.clone();
-                            let is_completed = state
-                                .completed_episodes
-                                .as_ref()
-                                .unwrap_or(&vec![])
-                                .contains(&check_episode_id);
-                            download_episode_item(
-                                Box::new(episode),
-                                sanitized_description.clone(),
-                                desc_expanded,
-                                &format_release,
-                                on_play_pause,
-                                on_shownotes_click,
-                                toggle_expanded,
-                                episode_duration_clone,
-                                episode_listened_clone,
-                                "local_downloads",
-                                on_checkbox_change_cloned, // Add this line
-                                is_delete_mode, // Add this line
-                                episode_url_for_ep_item,
-                                is_completed,
-                                show_modal,
-                                on_modal_open.clone(),
-                                on_modal_close.clone(),
-                                is_current_episode,
-                                is_playing,
-                                state.clone()
-                            )
-                        }) }
+                            }
                         </div>
                     </div>
                 }

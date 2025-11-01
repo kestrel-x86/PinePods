@@ -1,14 +1,12 @@
 use super::app_drawer::App_drawer;
-use super::gen_components::{
-    empty_message, on_shownotes_click, person_episode_item, Search_nav, UseScrollToTop,
-};
+use super::gen_components::{empty_message, on_shownotes_click, Search_nav, UseScrollToTop};
 use super::virtual_list::PersonEpisodeVirtualList;
 use crate::components::audio::on_play_pause;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
 use crate::components::gen_funcs::sanitize_html_with_blank_target;
-use crate::requests::people_req::PersonEpisode;
 use crate::requests::people_req::{self, PersonSubscription};
+use crate::requests::pod_req::Episode;
 use i18nrs::yew::use_translation;
 use yew::prelude::*;
 use yew::{function_component, html, Html};
@@ -25,7 +23,7 @@ use wasm_bindgen::prelude::*;
 #[derive(Clone, PartialEq, Properties, Debug)]
 struct PersonWithEpisodes {
     person: PersonSubscription,
-    episodes: Vec<PersonEpisode>,
+    episodes: Vec<Episode>,
     is_expanded: bool,
 }
 
@@ -317,7 +315,7 @@ fn get_proxied_image_url(server_name: &str, original_url: String) -> String {
 #[allow(dead_code)]
 fn render_host_with_episodes(
     person: &PersonSubscription,
-    episodes: Vec<PersonEpisode>,
+    episodes: Vec<Episode>,
     is_expanded: bool,
     toggle_host_expanded: Callback<MouseEvent>,
     state: Rc<AppState>,
@@ -386,118 +384,6 @@ fn render_host_with_episodes(
                             user_id={user_id.clone()}
                             api_key={api_key.clone()}
                         />
-                        // Old episode rendering code (disabled for virtual scrolling)
-                        { if false {
-                            let _ = episodes.iter().map(|episode| {
-                            let id_string = episode.episodeid.to_string();
-                            let desc_expanded = desc_rc.expanded_descriptions.contains(&id_string);
-                            let episode_url_for_closure = episode.episodeurl.clone();
-                            let episode_title_for_closure = episode.episodetitle.clone();
-                            let episode_description_for_closure = episode.episodedescription.clone();
-                            let episode_artwork_for_closure = episode.episodeartwork.clone();
-                            let episode_duration_for_closure = episode.episodeduration.clone();
-                            let listener_duration_for_closure = episode.listenduration.clone();
-                            let episode_id_for_closure = episode.episodeid.clone();
-                            let episode_is_youtube = Some(episode.is_youtube.clone());
-                            let _completed = false;
-                            let user_id_play = user_id.clone();
-                            let server_name_play = server_name.clone();
-                            let api_key_play = api_key.clone();
-                            let audio_dispatch = audio_dispatch.clone();
-
-                            let is_current_episode = audio_state
-                                .currently_playing
-                                .as_ref()
-                                .map_or(false, |current| current.episode_id == episode.episodeid);
-                            let is_playing = audio_state.audio_playing.unwrap_or(false);
-
-
-                            let date_format = match_date_format(state.date_format.as_deref());
-                            let datetime = parse_date(&episode.episodepubdate, &state.user_tz);
-                            let format_release = format!(
-                                "{}",
-                                format_datetime(&datetime, &state.hour_preference, date_format)
-                            );
-
-                            let on_play_pause = on_play_pause(
-                                episode_url_for_closure.clone(),
-                                episode_title_for_closure.clone(),
-                                episode_description_for_closure.clone(),
-                                format_release.clone(),
-                                episode_artwork_for_closure.clone().unwrap(),
-                                episode_duration_for_closure.clone(),
-                                episode_id_for_closure.clone(),
-                                Some(listener_duration_for_closure.clone()),
-                                api_key_play.unwrap().unwrap(),
-                                user_id_play.unwrap(),
-                                server_name_play.unwrap(),
-                                audio_dispatch.clone(),
-                                audio_state.clone(),
-                                None,
-                                episode_is_youtube.clone(),
-                            );
-
-                            let on_shownotes_click = on_shownotes_click(
-                                history_clone.clone(),
-                                dispatch.clone(),
-                                Some(episode_id_for_closure.clone()),
-                                Some(String::from("Not needed")),
-                                Some(String::from("Not needed")),
-                                Some(String::from("Not needed")),
-                                true,
-                                Some(true),
-                                Some(false),
-                            );
-
-                            #[wasm_bindgen]
-                            extern "C" {
-                                #[wasm_bindgen(js_namespace = window)]
-                                fn toggleDescription(guid: &str, expanded: bool);
-                            }
-                            let toggle_expanded = {
-                                let desc_dispatch = desc_state.clone();
-                                let episode_guid = episode.episodeid.clone().to_string();
-
-                                Callback::from(move |_: MouseEvent| {
-                                    let guid = episode_guid.clone();
-                                    desc_dispatch.reduce_mut(move |state| {
-                                        if state.expanded_descriptions.contains(&guid) {
-                                            state.expanded_descriptions.remove(&guid); // Collapse the description
-                                            toggleDescription(&guid, false); // Call JavaScript function
-                                        } else {
-                                            state.expanded_descriptions.insert(guid.clone()); // Expand the description
-                                            toggleDescription(&guid, true); // Call JavaScript function
-                                        }
-                                    });
-                                })
-                            };
-                            let show_modal = *active_modal == Some(episode.episodeid);
-                            person_episode_item(
-                                Box::new(episode.clone()),
-                                sanitize_html_with_blank_target(&episode.episodedescription),
-                                desc_expanded,
-                                &format_release,
-                                on_play_pause,
-                                on_shownotes_click,
-                                toggle_expanded,
-                                episode.episodeduration,
-                                Some(episode.listenduration),
-                                "people",
-                                Callback::noop(),
-                                false,
-                                episode.episodeurl.clone(),
-                                false,
-                                show_modal,
-                                on_modal_open.clone(),
-                                on_modal_close.clone(),
-                                is_current_episode,
-                                is_playing,
-                            )
-                            }).collect::<Vec<_>>();
-                            html! {}
-                        } else {
-                            html! {}
-                        } }
                     </div>
                 }
             } else {

@@ -60,11 +60,11 @@ async fn fallback_to_podcast_parsing(
             if let Some(ep) = result
                 .episodes
                 .iter()
-                .find(|ep| ep.enclosure_url.as_ref() == Some(&audio_url_clone))
+                .find(|ep| ep.episodeurl == audio_url_clone)
                 .cloned()
             {
-                let time_sec = convert_time_to_seconds(ep.duration.unwrap_or_default().as_str());
-                if let Ok(episodeduration) = time_sec {
+                let episodeduration = ep.episodeduration;
+                if episodeduration != 0 {
                     let ep_url = episode_url_clone.clone();
                     let aud_url = audio_url_clone.clone();
                     let podcast_title = podcast_title_clone.clone();
@@ -73,20 +73,20 @@ async fn fallback_to_podcast_parsing(
                     dispatch.reduce_mut(move |state| {
                         state.fetched_episode = Some(EpisodeMetadataResponse {
                             episode: EpisodeInfo {
-                                episodetitle: ep.title.unwrap_or_default(),
+                                episodetitle: ep.episodetitle,
                                 podcastname: podcast_title.clone(),
                                 podcastid: 0,
                                 podcastindexid: Some(podcast_index_id),
                                 feedurl: ep_url.clone(),
-                                episodepubdate: ep.pub_date.unwrap_or_default(),
+                                episodepubdate: ep.episodepubdate,
                                 // Apply sanitize_html_with_blank_target here too
                                 episodedescription: sanitize_html_with_blank_target(
-                                    &ep.description.unwrap_or_default(),
+                                    &ep.episodedescription,
                                 ),
-                                episodeartwork: ep.artwork.unwrap_or_default(),
+                                episodeartwork: ep.artworkurl,
                                 episodeurl: aud_url.clone(),
                                 episodeduration,
-                                listenduration: Some(episodeduration),
+                                listenduration: episodeduration,
                                 episodeid: episode_id,
                                 completed: false,
                                 is_downloaded: false,
@@ -803,40 +803,32 @@ pub fn epsiode() -> Html {
                                                 if let Some(ep) = result
                                                     .episodes
                                                     .iter()
-                                                    .find(|ep| {
-                                                        ep.enclosure_url.as_ref()
-                                                            == Some(&audio_url_clone)
-                                                    })
+                                                    .find(|ep| ep.episodeurl == audio_url_clone)
                                                     .cloned()
                                                 {
-                                                    let time_sec = convert_time_to_seconds(
-                                                        ep.duration.unwrap_or_default().as_str(),
-                                                    );
-                                                    if let Ok(episodeduration) = time_sec {
+                                                    if ep.episodeduration != 0 {
                                                         let ep_url = episode_url_clone.clone();
                                                         let aud_url = audio_url_clone.clone();
                                                         let podcast_title =
                                                             podcast_title_clone.clone();
-                                                        let episodeduration: i32 =
-                                                            episodeduration.try_into().unwrap_or(0);
 
                                                         dispatch.reduce_mut(move |state| {
                                                         state.fetched_episode = Some(EpisodeMetadataResponse {
                                                             episode: EpisodeInfo {
-                                                                episodetitle: ep.title.unwrap_or_default(),
+                                                                episodetitle: ep.episodetitle,
                                                                 podcastname: podcast_title.clone(),
                                                                 podcastid: 0,
                                                                 podcastindexid: Some(podcast_index_id),
                                                                 feedurl: ep_url.clone(),
-                                                                episodepubdate: ep.pub_date.unwrap_or_default(),
+                                                                episodepubdate: ep.episodepubdate,
                                                                 // KEY CHANGE: Apply sanitize_html_with_blank_target here
                                                                 episodedescription: sanitize_html_with_blank_target(
-                                                                    &ep.description.unwrap_or_default()
+                                                                    &ep.episodedescription
                                                                 ),
-                                                                episodeartwork: ep.artwork.unwrap_or_default(),
+                                                                episodeartwork: ep.artworkurl,
                                                                 episodeurl: audio_url.clone(),
-                                                                episodeduration,
-                                                                listenduration: Some(episodeduration),
+                                                                episodeduration: ep.episodeduration,
+                                                                listenduration: ep.episodeduration,
                                                                 episodeid: 0, // Set the episode ID to 0
                                                                 completed: false,
                                                                 is_downloaded: false,
@@ -942,25 +934,15 @@ pub fn epsiode() -> Html {
                                             if let Some(ep) = result
                                                 .episodes
                                                 .iter()
-                                                .find(|ep| {
-                                                    ep.enclosure_url.as_ref()
-                                                        == Some(&audio_url.clone())
-                                                })
+                                                .find(|ep| ep.episodeurl == audio_url)
                                                 .cloned()
                                             {
-                                                let time_sec = convert_time_to_seconds(
-                                                    ep.duration.unwrap_or_default().as_str(),
-                                                );
-                                                if let Ok(episodeduration) = time_sec {
-                                                    let episodeduration: i32 =
-                                                        episodeduration.try_into().unwrap_or(0);
+                                                if ep.episodeduration != 0 {
                                                     dispatch.reduce_mut(move |state| {
                                                         state.fetched_episode =
                                                             Some(EpisodeMetadataResponse {
                                                                 episode: EpisodeInfo {
-                                                                    episodetitle: ep
-                                                                        .title
-                                                                        .unwrap_or_default(),
+                                                                    episodetitle: ep.episodetitle,
                                                                     podcastname: podcast_title
                                                                         .clone(),
                                                                     podcastid: 0,
@@ -969,19 +951,15 @@ pub fn epsiode() -> Html {
                                                                     ),
                                                                     feedurl: feed_url.clone(),
                                                                     episodepubdate: ep
-                                                                        .pub_date
-                                                                        .unwrap_or_default(),
+                                                                        .episodepubdate,
                                                                     episodedescription: ep
-                                                                        .description
-                                                                        .unwrap_or_default(),
-                                                                    episodeartwork: ep
-                                                                        .artwork
-                                                                        .unwrap_or_default(),
+                                                                        .episodedescription,
+                                                                    episodeartwork: ep.artworkurl,
                                                                     episodeurl: audio_url.clone(),
-                                                                    episodeduration,
-                                                                    listenduration: Some(
-                                                                        episodeduration,
-                                                                    ),
+                                                                    episodeduration: ep
+                                                                        .episodeduration,
+                                                                    listenduration: ep
+                                                                        .episodeduration,
                                                                     episodeid: 0,
                                                                     completed: false,
                                                                     is_downloaded: false,
@@ -1011,9 +989,7 @@ pub fn epsiode() -> Html {
                                     person_episode: effect_pod_state
                                         .person_episode
                                         .unwrap_or(false), // Defaults to false if None
-                                    is_youtube: effect_pod_state
-                                        .selected_is_youtube
-                                        .unwrap_or(false),
+                                    is_youtube: effect_pod_state.selected_is_youtube,
                                 };
                                 effect_ep_in_db.set(true);
                                 wasm_bindgen_futures::spawn_local(async move {
@@ -1472,7 +1448,7 @@ pub fn epsiode() -> Html {
                                 audio_dispatch.clone(),
                                 audio_state.clone(),
                                 None,
-                                Some(episode_is_youtube),
+                                episode_is_youtube,
                             );
 
                             Callback::from(move |e: MouseEvent| {
@@ -1865,20 +1841,17 @@ pub fn epsiode() -> Html {
                         // let format_duration = format!("Duration: {} minutes", e / 60); // Assuming duration is in seconds
                         // let format_release = format!("Released on: {}", &episode.episode.EpisodePubDate);
                         // Before creating the play toggle handler, add this:
-                        let listen_duration_percentage = if let Some(listen_duration) = episode.episode.listenduration {
+                        let listen_duration_percentage =
                             if episode.episode.episodeduration > 0 {
-                                ((listen_duration as f64 / episode.episode.episodeduration as f64) * 100.0).min(100.0)
-                            } else {
-                                0.0
-                            }
+                                ((episode.episode.listenduration as f64 / episode.episode.episodeduration as f64) * 100.0).min(100f64)
                         } else {
                             0.0
                         };
 
                         // In the Episode component rendering logic, add this where appropriate:
-                        let progress_bar = if let Some(listen_duration) = episode.episode.listenduration {
-                            if listen_duration > 0 {
-                                let listen_duration_formatted = format_time(listen_duration as f64);
+                        let progress_bar = if episode.episode.listenduration != 0 {
+                            if episode.episode.listenduration > 0 {
+                                let listen_duration_formatted = format_time(episode.episode.listenduration as f64);
                                 html! {
                                     <div class="flex flex-col space-y-1 mt-2">
                                         <div class="flex items-center space-x-2">

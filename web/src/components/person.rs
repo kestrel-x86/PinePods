@@ -885,14 +885,14 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                                             episode_artwork_clone.clone(),
                                             episode_duration_clone,
                                             episode_id_clone.clone(),
-                                            Some(0),
+                                            0,
                                             api_key_play.unwrap().unwrap(),
                                             user_id_play.unwrap(),
                                             server_name_play.unwrap(),
                                             dispatch.clone(),
                                             audio_state.clone(),
                                             None,
-                                            Some(false),
+                                            false,
                                         );
 
                                         let description_class = if is_expanded {
@@ -913,7 +913,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                                                     class="episode-image"/>
                                                 <div class="flex flex-col p-4 space-y-2 flex-grow md:w-7/12">
                                                     <p class="item_container-text episode-title font-semibold"
-                                                    onclick={on_shownotes_click(history_clone.clone(), search_dispatch.clone(), Some(episode_id_for_ep_item), Some(podcast_link_clone), Some(shownotes_episode_url), Some(podcast_title), db_added, None, Some(false))}
+                                                    onclick={on_shownotes_click(history_clone.clone(), search_dispatch.clone(), Some(episode_id_for_ep_item), Some(podcast_link_clone), Some(shownotes_episode_url), Some(podcast_title), db_added, None, false)}
                                                     >{ &episode.title.clone().unwrap_or_default() }</p>
                                                     // <p class="text-gray-600">{ &episode.description.clone().unwrap_or_default() }</p>
                                                     {

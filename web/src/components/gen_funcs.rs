@@ -22,16 +22,6 @@ pub fn generate_gravatar_url(email: &Option<String>, size: usize) -> String {
     format!("https://gravatar.com/avatar/{}?s={}", hash, size)
 }
 
-// pub fn format_date(date_str: &str) -> String {
-//     let date =
-//         chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S").unwrap_or_else(|_| {
-//             chrono::DateTime::<chrono::Utc>::from_timestamp(0, 0)
-//                 .unwrap()
-//                 .naive_utc()
-//         }); // Fallback for parsing error
-//     date.format("%m-%d-%Y").to_string()
-// }
-
 pub fn format_date(date_str: &str) -> String {
     // Try parsing with the MySQL format
     let date = chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S")
@@ -125,7 +115,8 @@ pub fn truncate_description(description: String, max_length: usize) -> (String, 
     (truncated_html, is_truncated)
 }
 
-pub fn sanitize_html_with_blank_target(description: &str) -> String {
+/// Sets 'target=_blank' for all <a> elements in html text
+pub fn sanitize_html_with_blank_target(html: &str) -> String {
     // Create the inner HashMap for attribute "target" with value "_blank"
     let mut attribute_values = HashMap::new();
     attribute_values.insert("target", "_blank");
@@ -141,7 +132,7 @@ pub fn sanitize_html_with_blank_target(description: &str) -> String {
     builder.set_tag_attribute_values(tag_attribute_values); // set target="_blank" on all <a> tags
 
     // Clean the input HTML with the specified builder
-    builder.clean(description).to_string()
+    builder.clean(html).to_string()
 }
 
 pub fn encode_password(password: &str) -> Result<String, argon2::password_hash::Error> {
@@ -246,6 +237,7 @@ pub fn parse_opml(opml_content: &str) -> Vec<(String, String)> {
     podcasts
 }
 
+/// Format time in seconds to HH:MM:SS
 pub fn format_time(time_in_seconds: f64) -> String {
     let hours = (time_in_seconds / 3600.0).floor() as i32;
     let minutes = ((time_in_seconds % 3600.0) / 60.0).floor() as i32;
@@ -253,6 +245,7 @@ pub fn format_time(time_in_seconds: f64) -> String {
     format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
 }
 
+/// Format time in seconds to HH:MM:SS or MM:SS if hours is 0
 pub fn format_time_rm_hour(time_in_seconds: f64) -> String {
     let hours = (time_in_seconds / 3600.0).floor() as i32;
     let minutes = ((time_in_seconds % 3600.0) / 60.0).floor() as i32;
@@ -265,6 +258,7 @@ pub fn format_time_rm_hour(time_in_seconds: f64) -> String {
     }
 }
 
+/// Format time in minutes to HH:MM
 pub fn format_time_mins(time_in_minutes: i32) -> String {
     let time_in_minutes = time_in_minutes as f64;
     let hours = (time_in_minutes / 60.0).floor() as i32;
@@ -272,6 +266,7 @@ pub fn format_time_mins(time_in_minutes: i32) -> String {
     format!("{:02}:{:02}", hours, minutes)
 }
 
+/// Parse time formatted as HH:MM:SS into seconds
 pub fn convert_time_to_seconds(time: &str) -> Result<u32, Box<dyn std::error::Error>> {
     let parts: Vec<&str> = time.split(':').collect();
 
@@ -295,6 +290,7 @@ pub fn convert_time_to_seconds(time: &str) -> Result<u32, Box<dyn std::error::Er
     }
 }
 
+/// Removes all <img> tags from html
 pub fn strip_images_from_html(html: &str) -> String {
     let document = web_sys::window().unwrap().document().unwrap();
 

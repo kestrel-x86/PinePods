@@ -1,5 +1,6 @@
 // In components/mod.rs
 pub(crate) mod app_drawer;
+pub(crate) mod episode_list_item;
 pub(crate) mod feed;
 pub(crate) mod history;
 pub(crate) mod home;

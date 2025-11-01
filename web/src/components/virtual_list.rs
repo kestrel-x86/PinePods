@@ -1,16 +1,12 @@
-use super::gen_components::{
-    on_shownotes_click, ContextButton, EpisodeModal, EpisodeTrait, FallbackImage,
-};
+use super::gen_components::{on_shownotes_click, ContextButton, EpisodeModal, FallbackImage};
 use super::gen_funcs::{format_datetime, match_date_format, parse_date};
 use crate::components::audio::on_play_pause;
 use crate::components::context::{AppState, UIState};
-use crate::components::gen_funcs::{
-    convert_time_to_seconds, sanitize_html_with_blank_target, truncate_description,
-};
 use crate::components::gen_funcs::{format_time, strip_images_from_html};
+use crate::components::gen_funcs::{sanitize_html_with_blank_target, truncate_description};
 use crate::components::safehtml::SafeHtml;
-use crate::requests::people_req::PersonEpisode;
-use crate::requests::search_pods::Episode;
+use crate::components::episode_list_item::EpisodeListItem;
+use crate::requests::pod_req::Episode;
 use gloo::events::EventListener;
 use i18nrs::yew::use_translation;
 use std::rc::Rc;
@@ -139,29 +135,22 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
             let search_state_clone = props.search_state.clone();
             let search_ui_state_clone = props.search_ui_state.clone();
 
-            let episode_url_clone = episode.enclosure_url.clone().unwrap_or_default();
-            let episode_title_clone = episode.title.clone().unwrap_or_default();
-            let episode_description_clone = episode.description.clone().unwrap_or_default();
-            let episode_artwork_clone = episode.artwork.clone().unwrap_or_default();
-            let episode_duration_clone = episode.duration.clone().unwrap_or_default();
-            let episode_is_youtube = episode.is_youtube.clone();
-            web_sys::console::log_1(&format!("Virtual List - episode.is_youtube: {:?}", episode_is_youtube).into());
-            let episode_duration_in_seconds = match convert_time_to_seconds(&episode_duration_clone) {
-                Ok(seconds) => seconds as i32,
-                Err(e) => {
-                    eprintln!("Failed to convert time to seconds: {}", e);
-                    0
-                }
-            };
-            let episode_id_clone = episode.episode_id.unwrap_or(0);
+            let episode_url_clone = episode.episodeurl.clone();
+            let episode_title_clone = episode.episodetitle.clone();
+            let episode_description_clone = episode.episodedescription.clone();
+            let episode_artwork_clone = episode.artworkurl.clone();
+            let episode_duration_clone = episode.episodeduration.clone();
+            web_sys::console::log_1(&format!("Virtual List - episode.is_youtube: {:?}", episode.is_youtube).into());
+            let episode_duration_in_seconds = episode_duration_clone.clone();
+            let episode_id_clone = episode.episodeid;
 
             let server_name_play = props.server_name.clone();
             let user_id_play = props.user_id;
             let api_key_play = props.api_key.clone();
 
-            let is_expanded = search_state_clone.expanded_descriptions.contains(&episode.guid.clone().unwrap());
+            let is_expanded = search_state_clone.expanded_descriptions.contains(&episode.guid.clone());
 
-            let sanitized_description = sanitize_html_with_blank_target(&episode.description.clone().unwrap_or_default());
+            let sanitized_description = sanitize_html_with_blank_target(&episode.episodedescription.clone());
             let (description, _is_truncated) = if is_expanded {
                 (sanitized_description, false)
             } else {
@@ -169,7 +158,7 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
             };
 
             let date_format = match_date_format(search_state_clone.date_format.as_deref());
-            let datetime = parse_date(&episode.pub_date.clone().unwrap_or_default(), &search_state_clone.user_tz);
+            let datetime = parse_date(&episode.episodepubdate.clone(), &search_state_clone.user_tz);
             let format_release = format!("{}", format_datetime(&datetime, &search_state_clone.hour_preference, date_format));
 
             let on_play_pause = on_play_pause(
@@ -180,30 +169,29 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
                 episode_artwork_clone.clone(),
                 episode_duration_in_seconds,
                 episode_id_clone.clone(),
-                episode.listen_duration, // Use actual listen_duration instead of Some(0)
+                episode.listenduration,
                 api_key_play.unwrap().unwrap(),
                 user_id_play.unwrap(),
                 server_name_play.unwrap(),
                 dispatch.clone(),
                 search_ui_state_clone.clone(),
                 None, // is_local
-                episode_is_youtube, // is_youtube_vid
+                episode.is_youtube, // is_youtube_vid
             );
 
-            let boxed_episode = Box::new(episode.clone()) as Box<dyn EpisodeTrait>;
             let formatted_duration = format_time(episode_duration_in_seconds.into());
             let is_current_episode = props.search_ui_state
                 .currently_playing
                 .as_ref()
                 .map_or(false, |current| {
-                    let title_match = current.title == episode.title.clone().unwrap_or_default();
-                    let url_match = current.src == episode.enclosure_url.clone().unwrap_or_default();
+                    let title_match = current.title == episode.episodetitle.clone();
+                    let url_match = current.src == episode.episodeurl.clone();
 
                     // Add episode_id comparison
-                    let id_match = current.episode_id == episode.episode_id.unwrap_or(0);
+                    let id_match = current.episode_id == episode.episodeid;
 
                     // If it's YouTube content, prioritize ID and title match over URL
-                    if episode.is_youtube.unwrap_or(false) {
+                    if episode.is_youtube {
                         id_match || title_match
                     } else {
                         // For regular podcasts, use the original logic
@@ -228,8 +216,8 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
                 let search_dispatch = props.search_dispatch.clone();
                 let podcast_link = props.podcast_link.clone();
                 let podcast_title = props.podcast_title.clone();
-                let episode_id = episode.episode_id.unwrap_or(0);
-                let episode_url = episode.enclosure_url.clone().unwrap_or_default();
+                let episode_id = episode.episodeid;
+                let episode_url = episode.episodeurl.clone();
                 let is_youtube = episode.is_youtube.clone();
 
                 Callback::from(move |_: MouseEvent| {
@@ -242,7 +230,7 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
                         Some(podcast_title.clone()),
                         true,
                         None,
-                        is_youtube
+                        is_youtube.clone()
                     ).emit(MouseEvent::new("click").unwrap());
                 })
             };
@@ -250,14 +238,14 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
             html! {
                 <>
                 <div
-                    key={format!("{}-{}", episode.episode_id.unwrap_or(0), *force_update)}
+                    key={format!("{}-{}", episode.episodeid, *force_update)}
                     class="item-container border-solid border flex items-start mb-4 shadow-md rounded-lg"
                     style={format!("height: {}px; overflow: hidden;", *container_item_height)}
                 >
                     {
                         // Show checkbox when in selection mode
                         if props.is_selecting.unwrap_or(false) {
-                            let episode_id = episode.episode_id.unwrap_or(0);
+                            let episode_id = episode.episodeid;
                             let is_selected = props.selected_episodes.as_ref().map_or(false, |selected| selected.contains(&episode_id));
                             let on_select = props.on_episode_select.clone();
                             let checkbox_callback = Callback::from(move |_| {
@@ -270,7 +258,7 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
                                 <div class="flex flex-col items-center justify-center pl-4" style={format!("height: {}px;", *container_item_height)}>
                                     {
                                         if let Some(on_select_newer) = &props.on_select_newer {
-                                            let episode_id = episode.episode_id.unwrap_or(0);
+                                            let episode_id = episode.episodeid;
                                             let callback = on_select_newer.clone();
                                             let newer_callback = Callback::from(move |_| {
                                                 callback.emit(episode_id);
@@ -296,7 +284,7 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
                                     />
                                     {
                                         if let Some(on_select_older) = &props.on_select_older {
-                                            let episode_id = episode.episode_id.unwrap_or(0);
+                                            let episode_id = episode.episodeid;
                                             let callback = on_select_older.clone();
                                             let older_callback = Callback::from(move |_| {
                                                 callback.emit(episode_id);
@@ -322,18 +310,18 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
                     }
                     <div class="flex flex-col w-auto object-cover pl-4">
                         <FallbackImage
-                            src={episode.artwork.clone().unwrap_or_default()}
-                            alt={format!("{} {}", cover_for_text, &episode.title.clone().unwrap_or_default())}
+                            src={episode.artworkurl.clone()}
+                            alt={format!("{} {}", cover_for_text, &episode.episodetitle.clone())}
                             class="episode-image"
                         />
                     </div>
                     <div class="flex flex-col p-4 space-y-2 flex-grow md:w-7/12">
                         <div class="flex items-center space-x-2 cursor-pointer" onclick={make_shownotes_callback.clone()}>
                             <p class="item_container-text episode-title font-semibold line-clamp-2">
-                                { &episode.title.clone().unwrap_or_default() }
+                                { &episode.episodetitle.clone() }
                             </p>
                             {
-                                if episode.completed.unwrap_or(false) {
+                                if episode.completed{
                                     html! {
                                         <i class="ph ph-check-circle text-2xl text-green-500"></i>
                                     }
@@ -365,7 +353,7 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
                         </div>
 
                         {
-                            if episode.completed.unwrap_or(false) {
+                            if episode.completed {
                                 // For completed episodes
                                 if is_narrow_viewport {
                                     // In narrow viewports, just show "Completed"
@@ -384,9 +372,9 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
                                     }
                                 }
                             } else {
-                                if let Some(listen_duration) = episode.listen_duration {
+                                if  episode.listenduration > 0 {
                                     let listen_duration_percentage = if episode_duration_in_seconds > 0 {
-                                        ((listen_duration as f64 / episode_duration_in_seconds as f64) * 100.0).min(100.0)
+                                        ((episode.listenduration as f64 / episode_duration_in_seconds as f64) * 100.0).min(100.0)
                                     } else {
                                         0.0
                                     };
@@ -396,7 +384,7 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
                                             {
                                                 if !is_narrow_viewport {
                                                     html! {
-                                                        <span class="item_container-text">{ format_time(listen_duration as f64) }</span>
+                                                        <span class="item_container-text">{ format_time(episode.listenduration as f64) }</span>
                                                     }
                                                 } else {
                                                     html! {}
@@ -438,7 +426,7 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
                                             let page_type = "episode_layout".to_string();
                                             html! {
                                                 <div class="hidden sm:block">
-                                                    <ContextButton episode={boxed_episode} page_type={page_type.clone()} />
+                                                    <ContextButton episode={episode.clone()} page_type={page_type.clone()} />
                                                 </div>
                                             }
                                         } else {
@@ -474,10 +462,10 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
         {
             if let Some(index) = *selected_episode_index {
                 let episode = &props.episodes[index];
-                let sanitized_description = sanitize_html_with_blank_target(&episode.description.clone().unwrap_or_default());
+                let sanitized_description = sanitize_html_with_blank_target(&episode.episodedescription.clone());
                 let description = sanitized_description;
                 let date_format = match_date_format(props.search_state.date_format.as_deref());
-                let datetime = parse_date(&episode.pub_date.clone().unwrap_or_default(), &props.search_state.user_tz);
+                let datetime = parse_date(&episode.episodepubdate.clone(), &props.search_state.user_tz);
                 let format_release = format_datetime(&datetime, &props.search_state.hour_preference, date_format);
 
                 // Create the callback here where we have access to index
@@ -486,9 +474,9 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
                     let search_dispatch = props.search_dispatch.clone();
                     let podcast_link = props.podcast_link.clone();
                     let podcast_title = props.podcast_title.clone();
-                    let episode_id = episode.episode_id.unwrap_or(0);
-                    let episode_url = episode.enclosure_url.clone().unwrap_or_default();
-                    let is_youtube = episode.is_youtube.clone();
+                    let episode_id = episode.episodeid;
+                    let episode_url = episode.episodeurl.clone();
+                    let is_youtube = episode.is_youtube;
 
                     Callback::from(move |_: MouseEvent| {
                         on_shownotes_click(
@@ -507,17 +495,17 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
 
                 html! {
                     <EpisodeModal
-                        episode_id={episode.episode_id.unwrap_or(0)}
-                        episode_url={episode.enclosure_url.clone().unwrap()}
-                        episode_artwork={episode.artwork.clone().unwrap_or_default()}
-                        episode_title={episode.title.clone().unwrap_or_default()}
+                        episode_id={episode.episodeid}
+                        episode_url={episode.episodeurl.clone()}
+                        episode_artwork={episode.artworkurl.clone()}
+                        episode_title={episode.episodetitle.clone()}
                         description={description}
                         format_release={format_release}
-                        duration={episode.duration.clone().unwrap_or_default().parse().unwrap_or(0) as i32}
+                        duration={episode.episodeduration.clone()}
                         on_close={on_modal_close.clone()}
                         on_show_notes={modal_shownotes_callback}
                         listen_duration_percentage={0.0}
-                        is_youtube={episode.is_youtube.unwrap()}
+                        is_youtube={episode.is_youtube}
                     />
                 }
             } else {
@@ -530,7 +518,7 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
 
 #[derive(Properties, PartialEq)]
 pub struct PersonEpisodeVirtualListProps {
-    pub episodes: Vec<PersonEpisode>,
+    pub episodes: Vec<Episode>,
     pub item_height: f64,
     pub search_state: Rc<AppState>,
     pub search_ui_state: Rc<UIState>,
@@ -589,17 +577,11 @@ pub fn person_episode_virtual_list(props: &PersonEpisodeVirtualListProps) -> Htm
                     { (visible_start..visible_end).map(|index| {
                         let episode = &props.episodes[index];
                         html! {
-                            <PersonEpisodeComponent
-                                key={format!("{}", episode.episodeid)}
-                                episode={episode.clone()}
-                                search_state={props.search_state.clone()}
-                                search_ui_state={props.search_ui_state.clone()}
-                                dispatch={props.dispatch.clone()}
-                                search_dispatch={props.search_dispatch.clone()}
-                                history={props.history.clone()}
-                                server_name={props.server_name.clone()}
-                                user_id={props.user_id}
-                                api_key={props.api_key.clone()}
+                            <EpisodeListItem
+                                episode={ episode.clone() }
+                                page_type={ "people" }
+                                on_checkbox_change={ Callback::noop() }
+                                is_delete_mode={ false }
                             />
                         }
                     }).collect::<Html>() }
@@ -607,92 +589,4 @@ pub fn person_episode_virtual_list(props: &PersonEpisodeVirtualListProps) -> Htm
             </div>
         </div>
     }
-}
-
-#[derive(Properties, PartialEq, Clone)]
-pub struct PersonEpisodeComponentProps {
-    pub episode: PersonEpisode,
-    pub search_state: Rc<AppState>,
-    pub search_ui_state: Rc<UIState>,
-    pub dispatch: Dispatch<UIState>,
-    pub search_dispatch: Dispatch<AppState>,
-    pub history: BrowserHistory,
-    pub server_name: Option<String>,
-    pub user_id: Option<i32>,
-    pub api_key: Option<Option<String>>,
-}
-
-#[function_component(PersonEpisodeComponent)]
-pub fn person_episode_component(props: &PersonEpisodeComponentProps) -> Html {
-    use crate::components::gen_components::{on_shownotes_click, person_episode_item};
-    use crate::components::gen_funcs::sanitize_html_with_blank_target;
-
-    let state = props.search_state.clone();
-    let audio_state = props.search_ui_state.clone();
-    let audio_dispatch = props.dispatch.clone();
-
-    // Format date
-    let date_format = match_date_format(state.date_format.as_deref());
-    let episode = &props.episode;
-    let datetime = parse_date(&episode.episodepubdate, &state.user_tz);
-    let format_release = format_datetime(&datetime, &state.hour_preference, date_format);
-
-    let is_current_episode = audio_state
-        .currently_playing
-        .as_ref()
-        .map_or(false, |current| current.episode_id == episode.episodeid);
-    let is_playing = audio_state.audio_playing.unwrap_or(false);
-
-    let on_play_pause = on_play_pause(
-        episode.episodeurl.clone(),
-        episode.episodetitle.clone(),
-        episode.episodedescription.clone(),
-        format_release.clone(),
-        episode.episodeartwork.clone().unwrap_or_default(),
-        episode.episodeduration,
-        episode.episodeid,
-        Some(episode.listenduration),
-        props.api_key.clone().unwrap().unwrap(),
-        props.user_id.unwrap(),
-        props.server_name.clone().unwrap(),
-        audio_dispatch.clone(),
-        audio_state.clone(),
-        None,
-        Some(false), // person episodes are always non-YouTube
-    );
-
-    let on_shownotes_click = on_shownotes_click(
-        props.history.clone(),
-        props.search_dispatch.clone(),
-        Some(episode.episodeid),
-        Some(episode.episodeurl.clone()),
-        Some(episode.episodeurl.clone()),
-        None,
-        false,
-        Some(true), // person_episode
-        Some(episode.is_youtube),
-    );
-
-    // Use the proper episode item component
-    person_episode_item(
-        Box::new(episode.clone()),
-        sanitize_html_with_blank_target(&episode.episodedescription),
-        false, // desc_expanded
-        &format_release,
-        on_play_pause,
-        on_shownotes_click,
-        Callback::noop(), // toggle_expanded
-        episode.episodeduration,
-        Some(episode.listenduration),
-        "people",
-        Callback::noop(),
-        false,
-        episode.episodeurl.clone(),
-        false,
-        false,            // show_modal
-        Callback::noop(), // on_modal_open
-        Callback::noop(), // on_modal_close
-        is_current_episode,
-        is_playing,
-    )
 }

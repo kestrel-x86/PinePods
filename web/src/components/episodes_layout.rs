@@ -949,16 +949,19 @@ pub fn episode_layout() -> Html {
                 effect_added.clone(),
             ),
             move |_| {
-                let episode_name: Option<String> = click_state
+                let episode_name = click_state
+                    .podcast_feed_results
+                    .as_ref()
+                    .and_then(|r| r.episodes.get(0))
+                    .and_then(|ep| Some(ep.episodetitle.clone()))
+                    .unwrap_or_default();
+
+                let episode_url = click_state
                     .podcast_feed_results
                     .as_ref()
                     .and_then(|results| results.episodes.get(0))
-                    .and_then(|episode| episode.title.clone());
-                let episode_url: Option<String> = click_state
-                    .podcast_feed_results
-                    .as_ref()
-                    .and_then(|results| results.episodes.get(0))
-                    .and_then(|episode| episode.enclosure_url.clone());
+                    .and_then(|episode| Some(episode.episodeurl.clone()))
+                    .unwrap_or_default();
 
                 let bool_true = *effect_added; // Dereference here
 
@@ -972,7 +975,7 @@ pub fn episode_layout() -> Html {
                     let episode_url = episode_url;
                     let user_id = user_id.unwrap();
 
-                    if episode_name.is_some() && episode_url.is_some() {
+                    if !episode_name.is_empty() && !episode_url.is_empty() {
                         wasm_bindgen_futures::spawn_local(async move {
                             if let (Some(api_key), Some(server_name)) =
                                 (api_key.as_ref(), server_name.as_ref())
@@ -980,8 +983,8 @@ pub fn episode_layout() -> Html {
                                 match call_get_podcast_id_from_ep_name(
                                     &server_name,
                                     &api_key,
-                                    episode_name.unwrap(),
-                                    episode_url.unwrap(),
+                                    episode_name,
+                                    episode_url,
                                     user_id,
                                 )
                                 .await
@@ -1359,7 +1362,7 @@ pub fn episode_layout() -> Html {
                     .podcast_feed_results
                     .as_ref()
                     .and_then(|results| results.episodes.get(0))
-                    .and_then(|episode| episode.episode_id)
+                    .and_then(|episode| Some(episode.episodeid))
                 {
                     Some(id) => id,
                     None => {
@@ -1371,7 +1374,7 @@ pub fn episode_layout() -> Html {
                     .podcast_feed_results
                     .as_ref()
                     .and_then(|results| results.episodes.get(0))
-                    .and_then(|episode| episode.is_youtube)
+                    .and_then(|episode| Some(episode.is_youtube))
                 {
                     Some(id) => id,
                     None => {
@@ -3060,23 +3063,25 @@ pub fn episode_layout() -> Html {
                     .filter(|episode| {
                         // Search filter
                         let matches_search = if !search.is_empty() {
-                            episode.title.as_ref().map_or(false, |title| {
-                                title.to_lowercase().contains(&search.to_lowercase())
-                            }) || episode.description.as_ref().map_or(false, |desc| {
-                                desc.to_lowercase().contains(&search.to_lowercase())
-                            })
+                            episode
+                                .episodetitle
+                                .to_lowercase()
+                                .contains(&search.to_lowercase())
+                                || episode
+                                    .episodedescription
+                                    .to_lowercase()
+                                    .contains(&search.to_lowercase())
                         } else {
                             true
                         };
 
                         // Status filter
                         let matches_status = if **show_in_progress {
-                            !episode.completed.unwrap_or(false)
-                                && episode.listen_duration.unwrap_or(0) > 0
+                            !episode.completed && episode.listenduration > 0
                         } else {
                             match *completed_filter_state {
-                                CompletedFilter::ShowOnly => episode.completed.unwrap_or(false),
-                                CompletedFilter::Hide => !episode.completed.unwrap_or(false),
+                                CompletedFilter::ShowOnly => episode.completed,
+                                CompletedFilter::Hide => !episode.completed,
                                 CompletedFilter::ShowAll => true,
                             }
                         };
@@ -3089,12 +3094,20 @@ pub fn episode_layout() -> Html {
                 // Sort logic
                 if let Some(direction) = (*sort_dir).as_ref() {
                     filtered.sort_by(|a, b| match direction {
-                        EpisodeSortDirection::NewestFirst => b.pub_date.cmp(&a.pub_date),
-                        EpisodeSortDirection::OldestFirst => a.pub_date.cmp(&b.pub_date),
-                        EpisodeSortDirection::ShortestFirst => a.duration.cmp(&b.duration),
-                        EpisodeSortDirection::LongestFirst => b.duration.cmp(&a.duration),
-                        EpisodeSortDirection::TitleAZ => a.title.cmp(&b.title),
-                        EpisodeSortDirection::TitleZA => b.title.cmp(&a.title),
+                        EpisodeSortDirection::NewestFirst => {
+                            b.episodepubdate.cmp(&a.episodepubdate)
+                        }
+                        EpisodeSortDirection::OldestFirst => {
+                            a.episodepubdate.cmp(&b.episodepubdate)
+                        }
+                        EpisodeSortDirection::ShortestFirst => {
+                            a.episodepubdate.cmp(&b.episodepubdate)
+                        }
+                        EpisodeSortDirection::LongestFirst => {
+                            b.episodepubdate.cmp(&a.episodepubdate)
+                        }
+                        EpisodeSortDirection::TitleAZ => a.episodetitle.cmp(&b.episodetitle),
+                        EpisodeSortDirection::TitleZA => b.episodetitle.cmp(&a.episodetitle),
                     });
                 }
                 filtered
@@ -3713,7 +3726,7 @@ pub fn episode_layout() -> Html {
             let selected_episodes = selected_episodes_clone.clone();
             Callback::from(move |_| {
                 let all_ids: HashSet<i32> = filtered_episodes.iter()
-                    .filter_map(|ep| ep.episode_id)
+                    .map(|ep| ep.episodeid)
                     .collect();
 
                 let current = (*selected_episodes).clone();
@@ -3732,7 +3745,7 @@ pub fn episode_layout() -> Html {
             {
                 // this extra block is an expression, so valid
                 let all_ids: HashSet<i32> = filtered_episodes_clone.iter()
-                    .filter_map(|ep| ep.episode_id)
+                    .map(|ep| ep.episodeid)
                     .collect();
                 let current = (*selected_episodes_clone).clone();
                 if current.len() == all_ids.len() && all_ids.iter().all(|id| current.contains(id)) {
@@ -3752,8 +3765,8 @@ pub fn episode_layout() -> Html {
                                                                     let selected_episodes = selected_episodes_clone.clone();
                                                                     Callback::from(move |_| {
                                                                         let unplayed_ids: HashSet<i32> = filtered_episodes.iter()
-                                                                            .filter(|ep| !ep.completed.unwrap_or(false))
-                                                                            .filter_map(|ep| ep.episode_id)
+                                                                            .filter(|ep| !ep.completed)
+                                                                            .map(|ep| ep.episodeid)
                                                                             .collect();
                                                                         selected_episodes.set(unplayed_ids);
                                                                     })
@@ -4000,12 +4013,12 @@ pub fn episode_layout() -> Html {
                                         let selected_episodes_older = selected_episodes.clone();
                                         let on_select_older = Callback::from(move |cutoff_episode_id: i32| {
                                             let cutoff_index = filtered_episodes_older.iter()
-                                                .position(|ep| ep.episode_id == Some(cutoff_episode_id))
+                                                .position(|ep| ep.episodeid == cutoff_episode_id)
                                                 .unwrap_or(0);
 
                                             let older_ids: HashSet<i32> = filtered_episodes_older.iter()
                                                 .skip(cutoff_index) // Include the cutoff episode and all after it (older in reverse chronological order)
-                                                .filter_map(|ep| ep.episode_id)
+                                                .map(|ep| ep.episodeid)
                                                 .collect();
 
                                             selected_episodes_older.set({
@@ -4020,12 +4033,12 @@ pub fn episode_layout() -> Html {
                                         let selected_episodes_newer = selected_episodes.clone();
                                         let on_select_newer = Callback::from(move |cutoff_episode_id: i32| {
                                             let cutoff_index = filtered_episodes_newer.iter()
-                                                .position(|ep| ep.episode_id == Some(cutoff_episode_id))
+                                                .position(|ep| ep.episodeid == cutoff_episode_id)
                                                 .unwrap_or(0);
 
                                             let newer_ids: HashSet<i32> = filtered_episodes_newer.iter()
                                                 .take(cutoff_index + 1) // Include episodes before the cutoff (newer in reverse chronological order)
-                                                .filter_map(|ep| ep.episode_id)
+                                                .map(|ep| ep.episodeid)
                                                 .collect();
 
                                             selected_episodes_newer.set({
