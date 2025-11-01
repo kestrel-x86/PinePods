@@ -1293,16 +1293,10 @@ pub fn audio_player(props: &AudioPlayerProps) -> Html {
                     </div>
 
                     <div class="episode-button-container flex items-center justify-center">
-                        {
-                            html! {
-                                <>
-                                    <PlaybackControl
-                                        speed={audio_state.playback_speed}
-                                        on_speed_change={update_playback_closure}
-                                    />
-                                </>
-                            }
-                        }
+                        <PlaybackControl
+                            speed={audio_state.playback_speed}
+                            on_speed_change={update_playback_closure}
+                        />
                         <button onclick={skip_backward.clone()} class="pronounce-mobile rewind-button audio-top-button selector-button font-bold py-2 px-4 rounded-full w-10 h-10 flex items-center justify-center">
                             <i class="ph ph-rewind md:text-2xl text-4xl"></i>
                         </button>

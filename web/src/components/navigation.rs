@@ -279,9 +279,7 @@ pub fn navigation_handler(props: &NavigationHandlerProps) -> Html {
                 <div class="frame6"></div>
             </div>
         } else {
-            <>
-                { props.children.clone() }
-            </>
+            { props.children.clone() }
         }
     }
 }

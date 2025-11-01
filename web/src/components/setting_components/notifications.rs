@@ -602,7 +602,7 @@ pub fn notification_settings() -> Html {
                             </>
                         }
                     } else {
-                        html! { <></> }
+                        html! { }
                     }
                 }
 
@@ -666,7 +666,7 @@ pub fn notification_settings() -> Html {
                             </>
                         }
                     } else {
-                        html! { <></> }
+                        html! { }
                     }
                 }
 
