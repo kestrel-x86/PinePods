@@ -103,7 +103,7 @@ pub struct AppState {
     pub people_feed_results: Option<PeopleFeedResult>,
     pub server_feed_results: Option<RecentEps>,
     pub queued_episodes: Option<QueuedEpisodesResponse>,
-    pub saved_episodes: Option<SavedEpisodesResponse>,
+    pub saved_episodes: Option<Vec<Episode>>,
     pub episode_history: Option<HistoryDataResponse>,
     pub downloaded_episodes: Option<EpisodeDownloadResponse>,
     pub search_episodes: Option<SearchResponse>,
@@ -118,7 +118,7 @@ pub struct AppState {
     #[serde(default)]
     pub expanded_descriptions: HashSet<String>,
     pub selected_theme: Option<String>,
-    pub fetched_episode: Option<EpisodeMetadataResponse>,
+    pub fetched_episode: Option<Episode>,
     pub shared_fetched_episode: Option<SharedEpisodeResponse>,
     pub selected_episode_id: Option<i32>,
     pub selected_episode_url: Option<String>,

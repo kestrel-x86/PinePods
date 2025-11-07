@@ -5,6 +5,7 @@ use crate::components::audio::on_play_pause;
 use crate::components::audio::AudioPlayer;
 use crate::components::click_events::create_on_title_click;
 use crate::components::context::{AppState, UIState};
+use crate::components::episode_list_item::EpisodeListItem;
 use crate::components::gen_components::on_shownotes_click;
 use crate::components::gen_components::ContextButton;
 use crate::components::gen_funcs::{format_datetime, format_time, match_date_format, parse_date};
@@ -244,9 +245,9 @@ pub fn home() -> Html {
                                         <div class="space-y-4">
                                             { for home_data.in_progress_episodes.iter().take(3).map(|episode| {
                                                 html! {
-                                                    <HomeEpisodeItem
-                                                        episode={episode.clone()}
-                                                        page_type="home"
+                                                    <EpisodeListItem
+                                                        episode={ episode.clone() }
+                                                        page_type={ "home" }
                                                     />
                                                 }
                                             })}
@@ -273,7 +274,7 @@ pub fn home() -> Html {
                                     server_name_clone.unwrap_or_default(),
                                     api_key_clone,
                                     &history_clone,
-                                    podcast.podcastindexid.unwrap_or_default(),
+                                    podcast.podcastindexid,
                                     podcast.podcastname.clone(),
                                     podcast.feedurl.clone().unwrap_or_default(),
                                     podcast.description.clone().unwrap_or_else(|| i18n_no_description_provided.clone()),
@@ -414,13 +415,13 @@ pub fn home_episode_item(props: &HomeEpisodeItemProps) -> Html {
     };
 
     // Format durations for display
-    let formatted_duration = format_time(total_duration as f64);
+    let formatted_duration = format_time(total_duration);
     let duration_clone = formatted_duration.clone();
     let duration_again = formatted_duration.clone();
 
     // Format listen duration if it exists
     let formatted_listen_duration = if listen_duration > 0 {
-        Some(format_time(listen_duration as f64))
+        Some(format_time(listen_duration))
     } else {
         None
     };
@@ -433,21 +434,13 @@ pub fn home_episode_item(props: &HomeEpisodeItemProps) -> Html {
     );
 
     let on_play_pause = on_play_pause(
-        props.episode.episodeurl.clone(),
-        props.episode.episodetitle.clone(),
-        props.episode.episodedescription.clone(),
-        formatted_date.clone(),
-        props.episode.episodeartwork.clone(),
-        props.episode.episodeduration,
-        props.episode.episodeid,
-        props.episode.listenduration,
+        props.episode.clone(),
         api_key.unwrap().unwrap(),
         user_id.unwrap(),
         server_name.unwrap(),
         audio_dispatch.clone(),
         audio_state.clone(),
-        None,
-        props.episode.is_youtube,
+        false,
     );
 
     let on_shownotes_click = {

@@ -2,7 +2,6 @@ use super::app_drawer::App_drawer;
 use super::gen_components::{
     empty_message, on_shownotes_click, use_long_press, Search_nav, UseScrollToTop,
 };
-use crate::components::audio::on_play_pause;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
 use crate::components::episode_list_item::EpisodeListItem;
@@ -111,9 +110,7 @@ pub fn saved() -> Html {
                                     .collect();
 
                                 dispatch.reduce_mut(move |state| {
-                                    state.saved_episodes = Some(SavedEpisodesResponse {
-                                        episodes: fetched_episodes,
-                                    });
+                                    state.saved_episodes = Some(fetched_episodes);
                                     state.completed_episodes = Some(completed_episode_ids);
                                 });
 
@@ -159,7 +156,6 @@ pub fn saved() -> Html {
         |(saved_eps, search, sort_dir, show_completed, show_in_progress)| {
             if let Some(saved_episodes) = saved_eps {
                 let mut filtered = saved_episodes
-                    .episodes
                     .iter()
                     .filter(|episode| {
                         // Search filter

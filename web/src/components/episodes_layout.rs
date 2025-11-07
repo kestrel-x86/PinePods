@@ -9,6 +9,7 @@ use crate::components::gen_funcs::{
 use crate::components::host_component::HostDropdown;
 use crate::components::podcast_layout::ClickedFeedURL;
 use crate::components::virtual_list::PodcastEpisodeVirtualList;
+use crate::components::virtual_list::VirtualList;
 use crate::requests::pod_req::{
     call_add_category, call_add_podcast, call_adjust_skip_times, call_bulk_download_episodes,
     call_bulk_mark_episodes_completed, call_bulk_queue_episodes, call_bulk_save_episodes,
@@ -2799,7 +2800,7 @@ pub fn episode_layout() -> Html {
                                                         let podcast_index_id = if (*edit_podcast_index_id).trim().is_empty() || *edit_podcast_index_id == current_podcast_index_id {
                                                             None
                                                         } else {
-                                                            (*edit_podcast_index_id).parse::<i64>().ok()
+                                                            (*edit_podcast_index_id).parse::<i32>().ok()
                                                         };
 
                                                         // Check if any changes were made
@@ -2911,7 +2912,7 @@ pub fn episode_layout() -> Html {
                 let i18n_podcast_successfully_added = i18n_podcast_successfully_added.clone();
                 let i18n_failed_to_add_podcast = i18n_failed_to_add_podcast.clone();
                 let callback_podcast_id = added_id.clone();
-                let podcast_id_og = Some(pod_values.clone().unwrap().podcastid.clone());
+                let podcast_id_og = pod_values.clone().unwrap().podcastid.clone();
                 let pod_title_og = pod_values.clone().unwrap().podcastname.clone();
                 let pod_artwork_og = pod_values.clone().unwrap().artworkurl.clone();
                 let pod_author_og = pod_values.clone().unwrap().author.clone();
@@ -4049,28 +4050,11 @@ pub fn episode_layout() -> Html {
                                         });
 
                                         html! {
-                                            <PodcastEpisodeVirtualList
-                                                episodes={(*filtered_episodes).clone()}
-                                                item_height={220.0} // Adjust this based on your actual episode item height
-                                                podcast_added={podcast_added}
-                                                search_state={search_state.clone()}
-                                                search_ui_state={state.clone()}
-                                                dispatch={_dispatch.clone()}
-                                                search_dispatch={_search_dispatch.clone()}
-                                                history={history.clone()}
-                                                server_name={server_name.clone()}
-                                                user_id={user_id}
-                                                api_key={api_key.clone()}
-                                                podcast_link={podcast_link_clone}
-                                                podcast_title={podcast_title}
-                                                selected_episodes={Some(Rc::new((*selected_episodes).clone()))}
-                                                is_selecting={Some(*is_selecting)}
-                                                on_episode_select={Some(on_episode_select)}
-                                                on_select_older={Some(on_select_older)}
-                                                on_select_newer={Some(on_select_newer)}
+                                            <VirtualList
+                                                episodes={ (*filtered_episodes).clone() }
+                                                page_type={ "episodes" }
                                             />
                                         }
-
                                     } else {
                                         html! {
                                             <div class="empty-episodes-container" id="episode-container">

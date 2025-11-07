@@ -250,8 +250,6 @@ pub fn search(_props: &SearchProps) -> Html {
                                         <EpisodeListItem
                                             episode={ episode.clone() }
                                             page_type={ "search" }
-                                            on_checkbox_change={ Callback::noop() }
-                                            is_delete_mode={ false }
                                         />
                                     }
                                 }).collect::<Html>() }

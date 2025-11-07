@@ -24,8 +24,8 @@ pub struct PodcastSearchResult {
 #[derive(Deserialize, Debug, PartialEq, Clone, Serialize)]
 #[allow(non_snake_case)]
 pub struct UnifiedPodcast {
-    pub(crate) id: i64,
-    pub(crate) index_id: i64,
+    pub(crate) id: i32,
+    pub(crate) index_id: i32,
     pub(crate) title: String,
     pub(crate) url: String,
     #[allow(non_snake_case)]
@@ -109,7 +109,7 @@ impl From<ITunesPodcast> for UnifiedPodcast {
 #[derive(Deserialize, Debug, PartialEq, Clone, Serialize)]
 #[allow(non_snake_case)]
 pub struct Podcast {
-    pub(crate) id: i64,
+    pub(crate) id: i32,
     pub(crate) title: String,
     pub(crate) url: String,
     #[allow(non_snake_case)]
@@ -135,7 +135,7 @@ pub struct ITunesPodcast {
     pub wrapperType: String,
     pub kind: String,
     pub collectionId: i64,
-    pub trackId: i64,
+    pub trackId: i32,
     pub(crate) artistName: String,
     pub(crate) trackName: String,
     pub(crate) collectionViewUrl: String,
@@ -299,7 +299,7 @@ where
 #[derive(Deserialize, Debug, PartialEq, Clone, Serialize)]
 pub struct PeopleFeedResult {
     pub status: Option<String>,
-    pub items: Vec<PeopleEpisode>,
+    pub items: Vec<Episode>,
 }
 
 #[allow(dead_code)]
@@ -585,7 +585,7 @@ pub async fn call_get_podcast_details_dynamic(
     user_id: i32,
     podcast_title: &str,
     podcast_url: &str,
-    podcast_index_id: i64,
+    podcast_index_id: i32,
     added: bool,
     display_only: Option<bool>,
 ) -> Result<PodcastDetailsResponse, Error> {

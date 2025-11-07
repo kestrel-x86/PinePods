@@ -43,7 +43,7 @@ async fn fallback_to_podcast_parsing(
     episode_url_clone: String,
     audio_url_clone: String,
     podcast_title_clone: String,
-    podcast_index_id: i64,
+    podcast_index_id: i32,
     is_youtube: bool,
     episode_id: i32,
     dispatch: Dispatch<AppState>,
@@ -68,33 +68,9 @@ async fn fallback_to_podcast_parsing(
                     let ep_url = episode_url_clone.clone();
                     let aud_url = audio_url_clone.clone();
                     let podcast_title = podcast_title_clone.clone();
-                    let episodeduration: i32 = episodeduration.try_into().unwrap_or(0);
 
                     dispatch.reduce_mut(move |state| {
-                        state.fetched_episode = Some(EpisodeMetadataResponse {
-                            episode: EpisodeInfo {
-                                episodetitle: ep.episodetitle,
-                                podcastname: podcast_title.clone(),
-                                podcastid: 0,
-                                podcastindexid: Some(podcast_index_id),
-                                feedurl: ep_url.clone(),
-                                episodepubdate: ep.episodepubdate,
-                                // Apply sanitize_html_with_blank_target here too
-                                episodedescription: sanitize_html_with_blank_target(
-                                    &ep.episodedescription,
-                                ),
-                                episodeartwork: ep.artworkurl,
-                                episodeurl: aud_url.clone(),
-                                episodeduration,
-                                listenduration: episodeduration,
-                                episodeid: episode_id,
-                                completed: false,
-                                is_downloaded: false,
-                                is_queued: false,
-                                is_saved: false,
-                                is_youtube: false,
-                            },
-                        });
+                        state.fetched_episode = Some(ep.clone());
                         state.selected_episode_id = Some(episode_id);
                         state.selected_episode_url = Some(ep_url.clone());
                         state.selected_episode_audio_url = Some(aud_url.clone());
@@ -588,7 +564,7 @@ pub fn epsiode() -> Html {
                     let should_reload = if let Some(current_episode_id) = episode_id {
                         if let Some(fetched_episode) = &effect_pod_state.fetched_episode {
                             // Only reload if the episode ID has actually changed
-                            fetched_episode.episode.episodeid != current_episode_id
+                            fetched_episode.episodeid != current_episode_id
                         } else {
                             // No episode is currently loaded, so we need to load
                             true
@@ -621,7 +597,7 @@ pub fn epsiode() -> Html {
                         let audio_url = url_params.get("audio_url").unwrap_or_default();
                         let podcast_index_id = url_params
                             .get("podcast_index_id")
-                            .and_then(|id| id.parse::<i64>().ok())
+                            .and_then(|id| id.parse::<i32>().ok())
                             .unwrap_or(0);
                         let is_youtube = url_params // Add this
                             .get("is_youtube")
@@ -673,10 +649,7 @@ pub fn epsiode() -> Html {
                                                 dispatch.reduce_mut(move |state| {
                                                     state.selected_episode_id =
                                                         Some(fetched_episode_id);
-                                                    state.fetched_episode =
-                                                        Some(EpisodeMetadataResponse {
-                                                            episode: fetched_episode,
-                                                        });
+                                                    state.fetched_episode = Some(fetched_episode);
                                                     state.selected_episode_url =
                                                         Some(episode_url_clone2.clone());
                                                     state.selected_episode_audio_url =
@@ -813,35 +786,16 @@ pub fn epsiode() -> Html {
                                                             podcast_title_clone.clone();
 
                                                         dispatch.reduce_mut(move |state| {
-                                                        state.fetched_episode = Some(EpisodeMetadataResponse {
-                                                            episode: EpisodeInfo {
-                                                                episodetitle: ep.episodetitle,
-                                                                podcastname: podcast_title.clone(),
-                                                                podcastid: 0,
-                                                                podcastindexid: Some(podcast_index_id),
-                                                                feedurl: ep_url.clone(),
-                                                                episodepubdate: ep.episodepubdate,
-                                                                // KEY CHANGE: Apply sanitize_html_with_blank_target here
-                                                                episodedescription: sanitize_html_with_blank_target(
-                                                                    &ep.episodedescription
-                                                                ),
-                                                                episodeartwork: ep.artworkurl,
-                                                                episodeurl: audio_url.clone(),
-                                                                episodeduration: ep.episodeduration,
-                                                                listenduration: ep.episodeduration,
-                                                                episodeid: 0, // Set the episode ID to 0
-                                                                completed: false,
-                                                                is_downloaded: false,
-                                                                is_queued: false,
-                                                                is_saved: false,
-                                                                is_youtube: false,
-                                                            },
+                                                            state.fetched_episode =
+                                                                Some(ep.clone());
+                                                            state.selected_episode_id = Some(0);
+                                                            state.selected_episode_url =
+                                                                Some(ep_url.clone());
+                                                            state.selected_episode_audio_url =
+                                                                Some(aud_url.clone());
+                                                            state.selected_podcast_title =
+                                                                Some(podcast_title.clone());
                                                         });
-                                                        state.selected_episode_id = Some(0);
-                                                        state.selected_episode_url = Some(ep_url.clone());
-                                                        state.selected_episode_audio_url = Some(aud_url.clone());
-                                                        state.selected_podcast_title = Some(podcast_title.clone());
-                                                    });
 
                                                         // Update the URL with the parameters
                                                         let mut new_url =
@@ -939,35 +893,7 @@ pub fn epsiode() -> Html {
                                             {
                                                 if ep.episodeduration != 0 {
                                                     dispatch.reduce_mut(move |state| {
-                                                        state.fetched_episode =
-                                                            Some(EpisodeMetadataResponse {
-                                                                episode: EpisodeInfo {
-                                                                    episodetitle: ep.episodetitle,
-                                                                    podcastname: podcast_title
-                                                                        .clone(),
-                                                                    podcastid: 0,
-                                                                    podcastindexid: Some(
-                                                                        podcast_index_id,
-                                                                    ),
-                                                                    feedurl: feed_url.clone(),
-                                                                    episodepubdate: ep
-                                                                        .episodepubdate,
-                                                                    episodedescription: ep
-                                                                        .episodedescription,
-                                                                    episodeartwork: ep.artworkurl,
-                                                                    episodeurl: audio_url.clone(),
-                                                                    episodeduration: ep
-                                                                        .episodeduration,
-                                                                    listenduration: ep
-                                                                        .episodeduration,
-                                                                    episodeid: 0,
-                                                                    completed: false,
-                                                                    is_downloaded: false,
-                                                                    is_queued: false,
-                                                                    is_saved: false,
-                                                                    is_youtube: false,
-                                                                },
-                                                            });
+                                                        state.fetched_episode = Some(ep.clone());
                                                     });
                                                     loading_clone.set(false);
                                                 } else {
@@ -1048,51 +974,11 @@ pub fn epsiode() -> Html {
                                             let audio_url = fetched_episode.episodeurl.clone();
                                             let real_episode_id = fetched_episode.episodeid.clone();
                                             let podcast_index_id_push =
-                                                fetched_episode.podcastindexid.clone();
+                                                fetched_episode.podcastid.clone();
                                             dispatch.reduce_mut(move |state| {
                                                 state.selected_episode_id = Some(real_episode_id);
                                                 state.fetched_episode =
-                                                    Some(EpisodeMetadataResponse {
-                                                        episode: EpisodeInfo {
-                                                            episodetitle: fetched_episode
-                                                                .episodetitle
-                                                                .clone(),
-                                                            podcastname: fetched_episode
-                                                                .podcastname
-                                                                .clone(),
-                                                            podcastid: fetched_episode.podcastid,
-                                                            podcastindexid: fetched_episode
-                                                                .podcastindexid,
-                                                            feedurl: fetched_episode
-                                                                .feedurl
-                                                                .clone(),
-                                                            episodepubdate: fetched_episode
-                                                                .episodepubdate
-                                                                .clone(),
-                                                            episodedescription:
-                                                                sanitize_html_with_blank_target(
-                                                                    &fetched_episode
-                                                                        .episodedescription,
-                                                                ),
-                                                            episodeartwork: fetched_episode
-                                                                .episodeartwork
-                                                                .clone(),
-                                                            episodeurl: fetched_episode
-                                                                .episodeurl
-                                                                .clone(),
-                                                            episodeduration: fetched_episode
-                                                                .episodeduration,
-                                                            listenduration: fetched_episode
-                                                                .listenduration,
-                                                            episodeid: fetched_episode.episodeid,
-                                                            completed: fetched_episode.completed,
-                                                            is_downloaded: fetched_episode
-                                                                .is_downloaded,
-                                                            is_queued: fetched_episode.is_queued,
-                                                            is_saved: fetched_episode.is_saved,
-                                                            is_youtube: fetched_episode.is_youtube,
-                                                        },
-                                                    });
+                                                    Some(fetched_episode.clone());
                                             });
 
                                             // Add URL parameters
@@ -1108,9 +994,7 @@ pub fn epsiode() -> Html {
                                             new_url.push_str("&audio_url=");
                                             new_url.push_str(&urlencoding::encode(&audio_url));
                                             new_url.push_str("&podcast_index_id=");
-                                            new_url.push_str(
-                                                &podcast_index_id_push.unwrap_or(0).to_string(),
-                                            );
+                                            new_url.push_str(&podcast_index_id_push.to_string());
                                             new_url.push_str("&is_youtube=");
                                             new_url.push_str(&is_youtube.to_string());
 
@@ -1154,10 +1038,10 @@ pub fn epsiode() -> Html {
 
         use_effect_with(state.fetched_episode.clone(), move |_| {
             if let Some(episode) = &state.fetched_episode {
-                completion_status.set(episode.episode.completed);
-                queue_status.set(episode.episode.is_queued);
-                save_status.set(episode.episode.is_saved);
-                download_status.set(episode.episode.is_downloaded);
+                completion_status.set(episode.completed);
+                queue_status.set(episode.queued);
+                save_status.set(episode.saved);
+                download_status.set(episode.downloaded);
             } else {
                 web_sys::console::log_1(&i18n_no_episode_data_received.clone().into());
             }
@@ -1389,18 +1273,18 @@ pub fn epsiode() -> Html {
                     }
                 } else {
                     if let Some(episode) = state.fetched_episode.clone() {
-                        let episode_url_clone = episode.episode.episodeurl.clone();
-                        let episode_title_clone = episode.episode.episodetitle.clone();
-                        let episode_descripton_clone = episode.episode.episodedescription.clone();
-                        let episode_release_clone = episode.episode.episodepubdate.clone();
-                        let episode_artwork_clone = episode.episode.episodeartwork.clone();
-                        let episode_duration_clone = episode.episode.episodeduration.clone();
-                        let podcast_of_episode = episode.episode.podcastid.clone();
-                        let episode_listened_clone = episode.episode.listenduration.clone();
-                        let episode_id_clone = episode.episode.episodeid.clone();
-                        let episode_is_youtube = episode.episode.is_youtube.clone();
+                        let episode_url_clone = episode.episodeurl.clone();
+                        let episode_title_clone = episode.episodetitle.clone();
+                        let episode_descripton_clone = episode.episodedescription.clone();
+                        let episode_release_clone = episode.episodepubdate.clone();
+                        let episode_artwork_clone = episode.episodeartwork.clone();
+                        let episode_duration_clone = episode.episodeduration.clone();
+                        let podcast_of_episode = episode.podcastid.clone();
+                        let episode_listened_clone = episode.listenduration.clone();
+                        let episode_id_clone = episode.episodeid.clone();
+                        let episode_is_youtube = episode.is_youtube.clone();
 
-                        let sanitized_description = sanitize_html_with_blank_target(&episode.episode.episodedescription.clone());
+                        let sanitized_description = sanitize_html_with_blank_target(&episode.episodedescription.clone());
                         let description = sanitized_description;
 
                         let episode_url_for_closure = episode_url_clone.clone();
@@ -1434,21 +1318,13 @@ pub fn epsiode() -> Html {
 
                             // Create the base on_play_click callback
                             let on_play = on_play_click(
-                                episode_url_for_closure.clone(),
-                                episode_title_for_closure.clone(),
-                                episode_description_for_closure.clone(),
-                                episode_release_date_for_closure.clone(),
-                                episode_artwork_for_closure.clone(),
-                                episode_duration_for_closure.clone(),
-                                episode_id_for_closure.clone(),
-                                listener_duration_for_closure.clone(),
+                                episode.clone(),
                                 api_key_play.unwrap().unwrap(),
                                 user_id_play.unwrap(),
                                 server_name_play.unwrap(),
                                 audio_dispatch.clone(),
                                 audio_state.clone(),
-                                None,
-                                episode_is_youtube,
+                                false,
                             );
 
                             Callback::from(move |e: MouseEvent| {
@@ -1466,8 +1342,6 @@ pub fn epsiode() -> Html {
                                 }
                             })
                         };
-
-
 
                         let complete_server_name = server_name.clone();
                         let complete_api_key = api_key.clone();
@@ -1735,9 +1609,9 @@ pub fn epsiode() -> Html {
                             })
                         };
 
-                        let datetime = parse_date(&episode.episode.episodepubdate, &state.user_tz);
+                        let datetime = parse_date(&episode.episodepubdate, &state.user_tz);
                         let date_format = match_date_format(state.date_format.as_deref());
-                        let format_duration = format_time(episode.episode.episodeduration as f64);
+                        let format_duration = format_time(episode.episodeduration);
                         let format_release = format!("{}", format_datetime(&datetime, &state.hour_preference, date_format));
 
                         let on_title_click = {
@@ -1805,7 +1679,7 @@ pub fn epsiode() -> Html {
                                                 server_name.unwrap(),
                                                 api_key,
                                                 &history,
-                                                details.podcastindexid.unwrap_or(0),
+                                                details.podcastindexid,
                                                 details.podcastname,
                                                 details.feedurl,
                                                 details.description,
@@ -1838,20 +1712,18 @@ pub fn epsiode() -> Html {
                         let episode_url_check = episode_url_clone;
                         let should_show_buttons = !episode_url_check.is_empty();
 
-                        // let format_duration = format!("Duration: {} minutes", e / 60); // Assuming duration is in seconds
-                        // let format_release = format!("Released on: {}", &episode.episode.EpisodePubDate);
                         // Before creating the play toggle handler, add this:
                         let listen_duration_percentage =
-                            if episode.episode.episodeduration > 0 {
-                                ((episode.episode.listenduration as f64 / episode.episode.episodeduration as f64) * 100.0).min(100f64)
+                            if episode.episodeduration > 0 {
+                                ((episode.listenduration as f64 / episode.episodeduration as f64) * 100.0).min(100f64)
                         } else {
                             0.0
                         };
 
                         // In the Episode component rendering logic, add this where appropriate:
-                        let progress_bar = if episode.episode.listenduration != 0 {
-                            if episode.episode.listenduration > 0 {
-                                let listen_duration_formatted = format_time(episode.episode.listenduration as f64);
+                        let progress_bar = if episode.listenduration != 0 {
+                            if episode.listenduration > 0 {
+                                let listen_duration_formatted = format_time(episode.listenduration);
                                 html! {
                                     <div class="flex flex-col space-y-1 mt-2">
                                         <div class="flex items-center space-x-2">
@@ -1876,17 +1748,17 @@ pub fn epsiode() -> Html {
                                 <div class="episode-layout-container">
                                         <div class="item-header-mobile-cover-container">
                                             <FallbackImage
-                                                src={episode.episode.episodeartwork.clone()}
+                                                src={episode.episodeartwork.clone()}
                                                 // onclick={on_title_click.clone()}
-                                                alt={format!("{}{}", i18n_cover_alt_text, episode.episode.episodeartwork.clone())}
+                                                alt={format!("{}{}", i18n_cover_alt_text, episode.episodeartwork.clone())}
                                                 class="episode-artwork rounded-corners"
                                             />
                                         </div>
                                             <div class="episode-details">
-                                            <p class="item-header-pod mt-2 justify-center items-center" onclick={on_title_click.clone()}>{ &episode.episode.podcastname }</p>
+                                            <p class="item-header-pod mt-2 justify-center items-center" onclick={on_title_click.clone()}>{ &episode.podcastname }</p>
                                             <div class="items-center space-x-2 cursor-pointer">
                                                 <h2 class="episode-title item-header-title">
-                                                    { &episode.episode.episodetitle }
+                                                    { &episode.episodetitle }
                                                     {
                                                         if *completion_status.clone() {
                                                             html! {
@@ -1910,14 +1782,12 @@ pub fn epsiode() -> Html {
                                                     }
                                                 </h2>
                                             </div>
-                                            // <h2 class="episode-title">{ &episode.episode.episodetitle }</h2>
                                             <div class="flex justify-center items-center item-header-details">
                                                 <p class="episode-duration">{ format_duration }</p>
                                                 <span class="episode-duration">{"\u{00a0}-\u{00a0}"}</span>
                                                 <p class="episode-release-date">{ format_release }</p>
                                             </div>
                                             { progress_bar }
-
 
                                             {
                                                 if let Some(transcript) = &audio_state.episode_page_transcript {
@@ -1973,12 +1843,12 @@ pub fn epsiode() -> Html {
                                                             html! {
                                                                 <div class="header-info mb-2 overflow-x-auto whitespace-nowrap scroll-container">
                                                                     <HostDropdown
-                                                                        key={format!("host-{}", episode.episode.episodeid)} // Add this key prop
+                                                                        key={format!("host-{}", episode.episodeid)} // Add this key prop
                                                                         title={i18n_in_this_episode.clone()}
                                                                         hosts={people.clone()}
-                                                                        podcast_feed_url={episode.episode.episodeurl.clone()}
-                                                                        podcast_id={episode.episode.podcastid}
-                                                                        podcast_index_id={episode.episode.podcastindexid.unwrap_or(0)}
+                                                                        podcast_feed_url={episode.episodeurl.clone()}
+                                                                        podcast_id={episode.podcastid}
+                                                                        podcast_index_id={episode.podcastid}
                                                                     />
                                                                 </div>
                                                             }
@@ -2086,14 +1956,14 @@ pub fn epsiode() -> Html {
                                     <div class="item_container-text episode-description-container">
                                         <SafeHtml
                                             html={description}
-                                            episode_url={Some(episode.episode.episodeurl.clone())}
-                                            episode_title={Some(episode.episode.episodetitle.clone())}
-                                            episode_description={Some(episode.episode.episodedescription.clone())}
-                                            episode_release_date={Some(episode.episode.episodepubdate.clone())}
-                                            episode_artwork={Some(episode.episode.episodeartwork.clone())}
-                                            episode_duration={episode.episode.episodeduration}
-                                            episode_id={Some(episode.episode.episodeid)}
-                                            is_youtube={episode.episode.is_youtube}
+                                            episode_url={Some(episode.episodeurl.clone())}
+                                            episode_title={Some(episode.episodetitle.clone())}
+                                            episode_description={Some(episode.episodedescription.clone())}
+                                            episode_release_date={Some(episode.episodepubdate.clone())}
+                                            episode_artwork={Some(episode.episodeartwork.clone())}
+                                            episode_duration={episode.episodeduration}
+                                            episode_id={Some(episode.episodeid)}
+                                            is_youtube={episode.is_youtube}
                                         />
                                     </div>
                                     </div>
@@ -2105,17 +1975,17 @@ pub fn epsiode() -> Html {
                                 <div class="episode-layout-container">
                                     <div class="episode-top-info">
                                     <FallbackImage
-                                        src={episode.episode.episodeartwork.clone()}
-                                        alt={format!("{}{}", i18n_cover_alt_text, episode.episode.episodeartwork.clone())}
+                                        src={episode.episodeartwork.clone()}
+                                        alt={format!("{}{}", i18n_cover_alt_text, episode.episodeartwork.clone())}
                                         class="episode-artwork rounded-corners"
                                         style="max-width: 375px; width: 25%; height: auto;"
                                     />
                                         // Add overflow-hidden to episode-details to prevent children from expanding it
                                         <div class="episode-details overflow-hidden">
-                                            <h1 class="podcast-title hover-pointer-podcast-name" onclick={on_title_click.clone()}>{ &episode.episode.podcastname }</h1>
+                                            <h1 class="podcast-title hover-pointer-podcast-name" onclick={on_title_click.clone()}>{ &episode.podcastname }</h1>
                                             // Add max-w-full to ensure title container stays within bounds
                                             <div class="flex items-center space-x-2 cursor-pointer max-w-full">
-                                                <h2 class="episode-title truncate">{ &episode.episode.episodetitle }</h2>
+                                                <h2 class="episode-title truncate">{ &episode.episodetitle }</h2>
                                                 {
                                                     if *completion_status.clone() {
                                                         html! {
@@ -2126,7 +1996,6 @@ pub fn epsiode() -> Html {
                                                     }
                                                 }
                                             </div>
-                                            // <h2 class="episode-title">{ &episode.episode.episodetitle }</h2>
                                             <p class="episode-duration">{ format_duration }</p>
                                             <p class="episode-release-date">{ format_release }</p>
                                             { progress_bar }
@@ -2187,9 +2056,9 @@ pub fn epsiode() -> Html {
                                                                         <HostDropdown
                                                                             title={i18n_in_this_episode.clone()}
                                                                             hosts={people.clone()}
-                                                                            podcast_feed_url={episode.episode.episodeurl.clone()}
-                                                                            podcast_id={episode.episode.podcastid}
-                                                                            podcast_index_id={episode.episode.podcastindexid.unwrap_or(0)}
+                                                                            podcast_feed_url={episode.episodeurl.clone()}
+                                                                            podcast_id={episode.podcastid}
+                                                                            podcast_index_id={episode.podcastid}
                                                                         />
                                                                     </div>
                                                                 </div>
@@ -2311,14 +2180,14 @@ pub fn epsiode() -> Html {
                                     <div class="item_container-text episode-description-container">
                                         <SafeHtml
                                             html={description}
-                                            episode_url={Some(episode.episode.episodeurl.clone())}
-                                            episode_title={Some(episode.episode.episodetitle.clone())}
-                                            episode_description={Some(episode.episode.episodedescription.clone())}
-                                            episode_release_date={Some(episode.episode.episodepubdate.clone())}
-                                            episode_artwork={Some(episode.episode.episodeartwork.clone())}
-                                            episode_duration={episode.episode.episodeduration}
-                                            episode_id={Some(episode.episode.episodeid)}
-                                            is_youtube={episode.episode.is_youtube}
+                                            episode_url={Some(episode.episodeurl.clone())}
+                                            episode_title={Some(episode.episodetitle.clone())}
+                                            episode_description={Some(episode.episodedescription.clone())}
+                                            episode_release_date={Some(episode.episodepubdate.clone())}
+                                            episode_artwork={Some(episode.episodeartwork.clone())}
+                                            episode_duration={episode.episodeduration}
+                                            episode_id={Some(episode.episodeid)}
+                                            is_youtube={episode.is_youtube}
                                         />
                                     </div>
                                     </div>

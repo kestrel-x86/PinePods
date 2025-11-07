@@ -15,7 +15,7 @@ pub fn create_on_title_click(
     server_name: String,
     api_key: Option<Option<String>>,
     history: &BrowserHistory,
-    podcast_index_id: i64,
+    podcast_index_id: i32,
     podcast_title: String,
     podcast_url: String,
     podcast_description: String,

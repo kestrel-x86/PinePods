@@ -162,21 +162,13 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
             let format_release = format!("{}", format_datetime(&datetime, &search_state_clone.hour_preference, date_format));
 
             let on_play_pause = on_play_pause(
-                episode_url_clone.clone(),
-                episode_title_clone.clone(),
-                episode_description_clone.clone(),
-                format_release.clone(),
-                episode_artwork_clone.clone(),
-                episode_duration_in_seconds,
-                episode_id_clone.clone(),
-                episode.listenduration,
+                episode.clone(),
                 api_key_play.unwrap().unwrap(),
                 user_id_play.unwrap(),
                 server_name_play.unwrap(),
                 dispatch.clone(),
                 search_ui_state_clone.clone(),
-                None, // is_local
-                episode.is_youtube, // is_youtube_vid
+                false
             );
 
             let formatted_duration = format_time(episode_duration_in_seconds.into());
@@ -384,7 +376,7 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
                                             {
                                                 if !is_narrow_viewport {
                                                     html! {
-                                                        <span class="item_container-text">{ format_time(episode.listenduration as f64) }</span>
+                                                        <span class="item_container-text">{ format_time(episode.listenduration) }</span>
                                                     }
                                                 } else {
                                                     html! {}
@@ -504,7 +496,7 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
                         duration={episode.episodeduration.clone()}
                         on_close={on_modal_close.clone()}
                         on_show_notes={modal_shownotes_callback}
-                        listen_duration_percentage={0.0}
+                        listen_duration_percentage={0}
                         is_youtube={episode.is_youtube}
                     />
                 }
@@ -580,8 +572,6 @@ pub fn person_episode_virtual_list(props: &PersonEpisodeVirtualListProps) -> Htm
                             <EpisodeListItem
                                 episode={ episode.clone() }
                                 page_type={ "people" }
-                                on_checkbox_change={ Callback::noop() }
-                                is_delete_mode={ false }
                             />
                         }
                     }).collect::<Html>() }
@@ -615,10 +605,32 @@ fn calculate_item_height(window_width: f64) -> f64 {
     height
 }
 
+/// Any required callbacks for drag interactions. Field can be None if no callback is required.
+/// If no fields are set, dragging for this VirtualList will be disabled
+#[derive(Properties, PartialEq, Clone, Default)]
+pub struct DragCallbacks {
+    pub ondragstart: Option<Callback<DragEvent>>,
+    pub ondragenter: Option<Callback<DragEvent>>,
+    pub ondragover: Option<Callback<DragEvent>>,
+    pub ondrop: Option<Callback<DragEvent>>,
+}
+
+impl DragCallbacks {
+    /// Item is draggable if any callback field is set
+    pub fn draggable(&self) -> bool {
+        return self.ondragstart.is_some()
+            || self.ondragenter.is_some()
+            || self.ondragover.is_some()
+            || self.ondrop.is_some();
+    }
+}
+
 #[derive(Properties, PartialEq)]
 pub struct VirtualListProps {
     pub episodes: Vec<Episode>,
     pub page_type: String,
+    #[prop_or_default]
+    pub drag_callbacks: DragCallbacks,
 }
 
 #[function_component(VirtualList)]
@@ -729,8 +741,7 @@ pub fn virtual_list(props: &VirtualListProps) -> Html {
                     key={format!("{}-{}", episode.episodeid, *force_update)}
                     episode={episode.clone()}
                     page_type={props.page_type.clone()}
-                    on_checkbox_change={ Callback::noop() }
-                    is_delete_mode={ false }
+                    drag_callbacks={ props.drag_callbacks.clone() }
                 />
             }
         })

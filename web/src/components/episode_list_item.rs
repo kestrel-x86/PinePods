@@ -8,6 +8,7 @@ use crate::components::gen_funcs::{
 };
 use crate::components::gen_funcs::{format_time, strip_images_from_html};
 use crate::components::safehtml::SafeHtml;
+use crate::components::virtual_list::DragCallbacks;
 use crate::requests::pod_req::Episode;
 use gloo::history::BrowserHistory;
 use gloo_events::EventListener;
@@ -19,17 +20,21 @@ use yewdux::prelude::*;
 
 #[allow(dead_code)]
 #[derive(Properties, PartialEq, Clone)]
-pub struct VEpisodeProps {
+pub struct EpisodeListItemProps {
     pub episode: Episode,
     // pub _is_expanded: bool,
     // pub toggle_expanded: Callback<MouseEvent>,
     pub page_type: String,
+    #[prop_or_default]
     pub on_checkbox_change: Callback<i32>,
+    #[prop_or_default]
+    pub drag_callbacks: DragCallbacks,
+    #[prop_or_default]
     pub is_delete_mode: bool,
 }
 
 #[function_component(EpisodeListItem)]
-pub fn episode_list_item(props: &VEpisodeProps) -> Html {
+pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
     let (state, app_dispatch) = use_store::<AppState>();
     let (audio_state, audio_dispatch) = use_store::<UIState>();
     let (desc_state, desc_dispatch) = use_store::<ExpandedDescriptions>();
@@ -143,22 +148,13 @@ pub fn episode_list_item(props: &VEpisodeProps) -> Html {
     let server_name = state.auth_details.as_ref().map(|ud| ud.server_name.clone());
 
     let on_play_pause = on_play_pause(
-        // todo: clean up args
-        props.episode.episodeurl.clone(),
-        props.episode.episodetitle.clone(),
-        props.episode.episodedescription.clone(),
-        formatted_pub_date.clone(),
-        props.episode.episodeartwork.clone(),
-        props.episode.episodeduration.clone(),
-        props.episode.episodeid.clone(),
-        props.episode.listenduration,
+        props.episode.clone(),
         api_key.unwrap().unwrap(),
         user_id.unwrap(),
         server_name.unwrap(),
         audio_dispatch.clone(),
         audio_state.clone(),
-        None,
-        props.episode.is_youtube,
+        false,
     );
 
     /*
@@ -168,17 +164,16 @@ pub fn episode_list_item(props: &VEpisodeProps) -> Html {
     let episode_description = sanitize_html_with_blank_target(&props.episode.episodedescription);
 
     let (_listen_duration_str, listen_duration_percentage) = {
-        let lds = format_time(props.episode.listenduration as f64);
+        let lds = format_time(props.episode.listenduration);
         let ldp = if props.episode.listenduration > 0 {
-            ((props.episode.listenduration / props.episode.episodeduration) as f64 * 100.0)
-                .min(100.0)
+            ((props.episode.listenduration * 100) / props.episode.episodeduration).min(100)
         } else {
-            0.0
+            0
         };
         (lds, ldp)
     };
 
-    let episode_duration_str = format_time(props.episode.episodeduration as f64);
+    let episode_duration_str = format_time(props.episode.episodeduration);
 
     let is_completed = state
         .completed_episodes
@@ -292,10 +287,33 @@ pub fn episode_list_item(props: &VEpisodeProps) -> Html {
                     *container_height,
                     if *is_pressing_state { "none" } else { "auto" }
                 )}
-                ontouchstart={on_touch_start.clone() }
+                ontouchstart={ on_touch_start.clone() }
                 ontouchend={ on_touch_end.clone() }
-                ontouchmove={ on_touch_move .clone()}
+                ontouchmove={ on_touch_move.clone() }
+
+                draggable={ props.drag_callbacks.draggable().to_string() }
+                ondragstart={ props.drag_callbacks.ondragstart.clone() }
+                ondragenter={ props.drag_callbacks.ondragenter.clone() }
+                ondragover={ props.drag_callbacks.ondragover.clone() }
+                ondrop={ props.drag_callbacks.ondrop.clone() }
+
+                data-id={ props.episode.episodeid.to_string() }
             >
+
+                {
+                    if props.drag_callbacks.draggable()
+                    {
+                        html!{
+                            <div class="drag-handle-wrapper flex items-center justify-center w-10 h-full touch-none">
+                                <button class="drag-handle cursor-grab">
+                                    <i class="ph ph-dots-six-vertical text-2xl"></i>
+                                </button>
+                            </div>
+                        }
+                    } else {
+                        html!{ }
+                    }
+                }
 
                 {
                     if props.is_delete_mode {
@@ -316,7 +334,7 @@ pub fn episode_list_item(props: &VEpisodeProps) -> Html {
 
                 <div class="flex flex-col w-auto object-cover pl-4">
                     <FallbackImage
-                        src={props.episode.get_episode_artwork()}
+                        src={props.episode.episodeartwork.clone()}
                         alt={format!("Cover for {}", props.episode.get_episode_title())}
                         class="episode-image"
                     />
@@ -387,7 +405,7 @@ pub fn episode_list_item(props: &VEpisodeProps) -> Html {
                                         {
                                             if !is_narrow_viewport {
                                                 html! {
-                                                    <span class="item_container-text">{ format_time(props.episode.listenduration as f64) }</span>
+                                                    <span class="item_container-text">{ format_time(props.episode.listenduration) }</span>
                                                 }
                                             } else {
                                                 html! {}

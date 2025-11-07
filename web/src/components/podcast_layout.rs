@@ -21,7 +21,7 @@ use yewdux::use_store;
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct ClickedFeedURL {
-    pub podcastid: i64,
+    pub podcastid: i32,
     pub podcastname: String,
     pub feedurl: String,
     pub description: String,
@@ -31,7 +31,7 @@ pub struct ClickedFeedURL {
     pub episodecount: i32,
     pub categories: Option<HashMap<String, String>>,
     pub websiteurl: String,
-    pub podcastindexid: i64,
+    pub podcastindexid: i32,
     pub is_youtube: Option<bool>,
 }
 
@@ -49,7 +49,7 @@ impl ClickedFeedURL {
             websiteurl: self.websiteurl,
             explicit: self.explicit,
             userid: 0, // Default value since it's not in ClickedFeedURL
-            podcastindexid: Some(self.podcastindexid),
+            podcastindexid: self.podcastindexid,
             is_youtube: self.is_youtube.unwrap_or(false),
         }
     }
@@ -326,7 +326,7 @@ pub fn podcast_item(props: &PodcastProps) -> Html {
                         &api_key.unwrap(),
                         user_id.unwrap(),
                         &podcast_values,
-                        Some(podcast.id),
+                        podcast.id,
                     )
                     .await
                     {

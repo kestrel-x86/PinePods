@@ -96,7 +96,7 @@ pub async fn start_local_file_server(file_path: &str) -> Result<String, JsValue>
     }
 }
 
-pub async fn update_local_database(episode_info: EpisodeInfo) -> Result<(), JsValue> {
+pub async fn update_local_database(episode_info: Episode) -> Result<(), JsValue> {
     // Get window object
     let window = web_sys::window().ok_or_else(|| JsValue::from_str("No window object found"))?;
 
@@ -485,9 +485,7 @@ pub fn downloads() -> Html {
                         Ok(_) => {
                             dispatch_for_future.reduce_mut(|state| {
                                 if let Some(downloaded_episodes) = &mut state.downloaded_episodes {
-                                    downloaded_episodes.episodes.retain(|ep| {
-                                        !selected_episodes.contains(&ep.episodeid)
-                                    });
+                                    downloaded_episodes.episodes.retain(|ep| !selected_episodes.contains(&ep.episodeid));
                                 }
                                 state.info_message = Some(format!(
                                     "{} {}",

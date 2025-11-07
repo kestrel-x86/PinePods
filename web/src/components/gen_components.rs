@@ -686,7 +686,7 @@ pub fn first_admin_modal(props: &FirstAdminModalProps) -> Html {
     }
 }
 
-#[derive(Properties, Clone)]
+#[derive(Properties, Clone, PartialEq)]
 pub struct ContextButtonProps {
     pub episode: Episode,
     pub page_type: String,
@@ -1005,7 +1005,6 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
                             // Here, you should remove the episode from the saved_episodes
                             if let Some(ref mut saved_episodes) = state.saved_episodes {
                                 saved_episodes
-                                    .episodes
                                     .retain(|ep| ep.get_episode_id(Some(0)) != episode_id);
                             }
                             if let Some(ref mut saved_episode_ids) = state.saved_episode_ids {
@@ -1038,11 +1037,6 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
     let on_toggle_save = {
         let on_save_episode = on_save_episode.clone();
         let on_remove_saved_episode = on_remove_saved_episode.clone();
-        // let is_saved = post_state
-        //     .saved_episode_ids
-        //     .as_ref()
-        //     .unwrap_or(&vec![])
-        //     .contains(&props.episode.get_episode_id(Some(0)));
         Callback::from(move |_| {
             if is_saved {
                 on_remove_saved_episode.emit(());
@@ -1609,7 +1603,6 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
                     { "Remove from Saved Episodes" }
                 </li>
                 {
-                    // Handle download_button as VNode
                     download_button.clone()
                 }
                 <li class="dropdown-option" onclick={wrap_action(on_toggle_complete.clone())}>
@@ -1712,24 +1705,6 @@ pub fn empty_message(header: &str, paragraph: &str) -> Html {
     }
 }
 
-impl PartialEq for ContextButtonProps {
-    fn eq(&self, _other: &Self) -> bool {
-        if let Some(other) = self.episode.as_any().downcast_ref::<Episode>() {
-            if let Some(self_episode) = self.episode.as_any().downcast_ref::<Episode>() {
-                return self_episode == other;
-            }
-        }
-
-        if let Some(other) = self.episode.as_any().downcast_ref::<QueuedEpisode>() {
-            if let Some(self_episode) = self.episode.as_any().downcast_ref::<QueuedEpisode>() {
-                return self_episode == other;
-            }
-        }
-
-        false
-    }
-}
-
 pub fn on_shownotes_click(
     history: BrowserHistory,
     dispatch: Dispatch<AppState>,
@@ -1781,7 +1756,7 @@ pub struct EpisodeModalProps {
     pub duration: i32,
     pub on_close: Callback<MouseEvent>,
     pub on_show_notes: Callback<MouseEvent>,
-    pub listen_duration_percentage: f64,
+    pub listen_duration_percentage: i32,
     pub is_youtube: bool,
 }
 

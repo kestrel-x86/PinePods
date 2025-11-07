@@ -68,7 +68,6 @@ pub struct Episode {
     #[serde(alias = "Episodetitle")]
     pub episodetitle: String,
     pub description: String,
-    #[serde(alias = "Episodeartwork")]
     pub artworkurl: String,
     pub author: String,
     pub categories: Option<HashMap<String, String>>,
@@ -83,6 +82,7 @@ pub struct Episode {
     pub episodeid: i32,
     #[serde(alias = "Episodeurl")]
     pub episodeurl: String,
+    #[serde(alias = "Episodeartwork")]
     pub episodeartwork: String,
     #[serde(alias = "Episodepubdate")]
     pub episodepubdate: String,
@@ -214,7 +214,7 @@ pub async fn call_add_podcast(
     api_key: &Option<String>,
     _user_id: i32,
     added_podcast: &PodcastValues,
-    podcast_index_id: Option<i64>,
+    podcast_index_id: i32,
 ) -> Result<PodcastStatusResponse, Error> {
     let url = format!("{}/api/data/add_podcast", server_name);
     let api_key_ref = api_key
@@ -225,7 +225,7 @@ pub async fn call_add_podcast(
     #[derive(Serialize)]
     struct AddPodcastRequest {
         podcast_values: PodcastValues,
-        podcast_index_id: Option<i64>,
+        podcast_index_id: i32,
     }
 
     let request_body = AddPodcastRequest {
@@ -266,7 +266,7 @@ pub struct UpdatePodcastInfoRequest {
     pub author: Option<String>,
     pub artwork_url: Option<String>,
     pub website_url: Option<String>,
-    pub podcast_index_id: Option<i64>,
+    pub podcast_index_id: Option<i32>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
@@ -289,7 +289,7 @@ pub async fn call_update_podcast_info(
     author: Option<String>,
     artwork_url: Option<String>,
     website_url: Option<String>,
-    podcast_index_id: Option<i64>,
+    podcast_index_id: Option<i32>,
 ) -> Result<UpdatePodcastInfoResponse, Error> {
     let url = format!("{}/api/data/update_podcast_info", server_name);
     let api_key_ref = api_key
@@ -451,7 +451,7 @@ pub struct Podcast {
     #[serde(deserialize_with = "bool_from_int")]
     pub explicit: bool,
     #[serde(default)]
-    pub podcastindexid: Option<i64>,
+    pub podcastindexid: i32,
 }
 
 pub async fn call_get_podcasts(
@@ -516,7 +516,7 @@ pub struct PodcastExtra {
     pub categories: Option<HashMap<String, String>>,
     #[serde(deserialize_with = "bool_from_int")]
     pub explicit: bool,
-    pub podcastindexid: i64,
+    pub podcastindexid: i32,
     #[serde(default)]
     pub play_count: i64,
     #[serde(default)]
@@ -542,7 +542,7 @@ impl From<Podcast> for PodcastExtra {
             author: podcast.author,
             categories: podcast.categories,
             explicit: podcast.explicit,
-            podcastindexid: podcast.podcastindexid.unwrap_or(0),
+            podcastindexid: podcast.podcastindexid,
             play_count: 0,
             episodes_played: 0,
             oldest_episode_date: None,
@@ -564,7 +564,7 @@ impl From<PodcastExtra> for Podcast {
             author: podcast_extra.author,
             categories: podcast_extra.categories,
             explicit: podcast_extra.explicit,
-            podcastindexid: Some(podcast_extra.podcastindexid),
+            podcastindexid: podcast_extra.podcastindexid,
         }
     }
 }
@@ -972,8 +972,6 @@ pub async fn call_get_saved_episodes(
     }
 
     let response_text = response.text().await?;
-    // let response_text = response.text().await?;
-
     let response_data: SavedDataResponse = serde_json::from_str(&response_text)?;
     Ok(response_data.saved_episodes)
 }
@@ -1365,7 +1363,7 @@ pub struct EpisodeInfo {
     pub episodetitle: String,
     pub podcastname: String,
     pub podcastid: i32,
-    pub podcastindexid: Option<i64>,
+    pub podcastindexid: i32,
     pub feedurl: String,
     pub episodepubdate: String,
     pub episodedescription: String,
@@ -1401,7 +1399,7 @@ pub async fn call_get_episode_metadata(
     server_name: &str,
     api_key: Option<String>,
     episode_request: &EpisodeRequest,
-) -> Result<EpisodeInfo, anyhow::Error> {
+) -> Result<Episode, anyhow::Error> {
     let url = format!("{}/api/data/get_episode_metadata", server_name);
 
     let api_key_ref = api_key
@@ -1427,9 +1425,9 @@ pub async fn call_get_episode_metadata(
 
     let response_text = response.text().await?;
 
-    let response_data: EpisodeMetadataResponse = serde_json::from_str(&response_text)
+    let ep: Episode = serde_json::from_str(&response_text)
         .map_err(|e| anyhow::Error::msg(format!("Deserialization Error: {}", e)))?;
-    Ok(response_data.episode)
+    Ok(ep)
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
@@ -1935,7 +1933,7 @@ pub struct PodcastDetails {
     pub explicit: bool,
     pub userid: i32,
     #[serde(default)] // Add this to handle null more gracefully
-    pub podcastindexid: Option<i64>,
+    pub podcastindexid: i32,
     #[serde(rename = "isyoutubechannel")]
     pub is_youtube: bool,
 }
@@ -3581,7 +3579,7 @@ pub async fn call_update_episode_duration(
 pub struct HomePodcast {
     pub podcastid: i32,
     pub podcastname: String,
-    pub podcastindexid: Option<i64>,
+    pub podcastindexid: i32,
     pub artworkurl: Option<String>,
     pub author: Option<String>,
     pub categories: Option<HashMap<String, String>>,

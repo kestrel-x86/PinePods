@@ -846,21 +846,13 @@ pub fn audio_player(props: &AudioPlayerProps) -> Html {
                                             ep.queueposition == Some(current_queue_position + 1)
                                         }) {
                                             on_play_click(
-                                                next_episode.episodeurl.clone(),
-                                                next_episode.episodetitle.clone(),
-                                                next_episode.episodedescription.clone(),
-                                                next_episode.episodepubdate.clone(),
-                                                next_episode.episodeartwork.clone(),
-                                                next_episode.episodeduration,
-                                                next_episode.episodeid,
-                                                next_episode.listenduration,
+                                                next_episode.clone(),
                                                 api_key.clone().unwrap().unwrap(),
                                                 user_id.unwrap(),
                                                 server_name.clone().unwrap(),
                                                 audio_dispatch.clone(),
                                                 audio_state.clone(),
-                                                None,
-                                                next_episode.is_youtube,
+                                                false,
                                             )
                                             .emit(MouseEvent::new("click").unwrap());
                                         } else {
@@ -1008,21 +1000,13 @@ pub fn audio_player(props: &AudioPlayerProps) -> Html {
                             .find(|ep| ep.queueposition == Some(current_queue_position + 1))
                         {
                             on_play_click(
-                                next_episode.episodeurl.clone(),
-                                next_episode.episodetitle.clone(),
-                                next_episode.episodedescription.clone(),
-                                next_episode.episodepubdate.clone(),
-                                next_episode.episodeartwork.clone(),
-                                next_episode.episodeduration,
-                                next_episode.episodeid,
-                                next_episode.listenduration,
+                                next_episode.clone(),
                                 api_key.clone().unwrap().unwrap(),
                                 user_id.unwrap(),
                                 server_name.clone().unwrap(),
                                 audio_dispatch.clone(),
                                 audio_state.clone(),
-                                None,
-                                next_episode.is_youtube,
+                                false,
                             )
                             .emit(MouseEvent::new("click").unwrap());
                         } else {
@@ -1130,7 +1114,7 @@ pub fn audio_player(props: &AudioPlayerProps) -> Html {
                                         0.0
                                     };
 
-                                    let formatted_start = format_time_rm_hour(start_time);
+                                    let formatted_start = format_time_rm_hour(start_time as i32);
                                     let click_start_time = start_time;
                                     let on_chapter_click = on_chapter_click.clone();
                                     let on_chapter_click_button = on_chapter_click.clone();
@@ -1459,7 +1443,7 @@ pub fn audio_player(props: &AudioPlayerProps) -> Html {
                             duration={audio_props.duration_sec as i32}
                             on_close={on_modal_close.clone()}
                             on_show_notes={nav_to_episode}
-                            listen_duration_percentage={listen_duration_percentage}
+                            listen_duration_percentage={listen_duration_percentage as i32}
                             is_youtube={props.is_youtube}
                         />
                     }
@@ -1475,41 +1459,19 @@ pub fn audio_player(props: &AudioPlayerProps) -> Html {
 }
 
 pub fn on_play_pause(
-    episode_url_for_closure: String,
-    episode_title_for_closure: String,
-    episode_description_for_closure: String,
-    episode_release_date_for_closure: String,
-    episode_artwork_for_closure: String,
-    episode_duration_for_closure: i32,
-    episode_id_for_closure: i32,
-    listen_duration_for_closure: i32,
+    episode: Episode,
     api_key: String,
     user_id: i32,
     server_name: String,
     audio_dispatch: Dispatch<UIState>,
     audio_state: Rc<UIState>,
-    is_local: Option<bool>,
-    is_youtube_vid: bool,
+    is_local: bool,
 ) -> Callback<MouseEvent> {
     Callback::from(move |e: MouseEvent| {
-        let episode_url_for_play = episode_url_for_closure.clone();
-        let episode_title_for_play = episode_title_for_closure.clone();
-        let episode_description_for_play = episode_description_for_closure.clone();
-        let episode_release_date_for_play = episode_release_date_for_closure.clone();
-        let episode_artwork_for_play = episode_artwork_for_closure.clone();
-        let episode_duration_for_play = episode_duration_for_closure.clone();
-        let episode_id_for_play = episode_id_for_closure.clone();
-        let server_play = server_name.clone();
-        let api_play = api_key.clone();
-        let audio_dis_play = audio_dispatch.clone();
-        let audio_state_play = audio_state.clone();
-        // Changed from '_' to 'e'
         let is_current = audio_state
             .currently_playing
             .as_ref()
-            .map_or(false, |current| {
-                current.episode_id == episode_id_for_closure
-            });
+            .map_or(false, |current| current.episode_id == episode.episodeid);
         if is_current {
             audio_dispatch.reduce_mut(|state| {
                 let currently_playing = state.audio_playing.unwrap_or(false);
@@ -1526,112 +1488,68 @@ pub fn on_play_pause(
             web_sys::console::log_1(
                 &format!(
                     "on_play_pause calling on_play_click with is_youtube_vid: {:?}",
-                    is_youtube_vid
+                    episode.is_youtube
                 )
                 .into(),
             );
             on_play_click(
-                episode_url_for_play,
-                episode_title_for_play,
-                episode_description_for_play,
-                episode_release_date_for_play,
-                episode_artwork_for_play,
-                episode_duration_for_play,
-                episode_id_for_play,
-                listen_duration_for_closure,
-                api_play,
+                episode.clone(),
+                api_key.clone(),
                 user_id,
-                server_play,
-                audio_dis_play,
-                audio_state_play,
+                server_name.clone(),
+                audio_dispatch.clone(),
+                audio_state.clone(),
                 is_local,
-                is_youtube_vid,
             )
-            .emit(e); // Pass the event instead of '_'
+            .emit(e);
         }
     })
 }
 
 pub fn on_play_click(
-    episode_url_for_closure: String,
-    episode_title_for_closure: String,
-    episode_description_for_closure: String,
-    episode_release_date_for_closure: String,
-    episode_artwork_for_closure: String,
-    episode_duration_for_closure: i32,
-    episode_id_for_closure: i32,
-    listen_duration_for_closure: i32,
+    mut episode: Episode,
     api_key: String,
     user_id: i32,
     server_name: String,
     audio_dispatch: Dispatch<UIState>,
     _audio_state: Rc<UIState>,
-    is_local: Option<bool>,
-    is_youtube_vid: bool,
+    is_local: bool,
 ) -> Callback<MouseEvent> {
     Callback::from(move |_: MouseEvent| {
-        let episode_url_for_closure = episode_url_for_closure.clone();
-        let episode_title_for_closure = episode_title_for_closure.clone();
-        let episode_description_for_closure = episode_description_for_closure.clone();
-        let episode_release_date_for_closure = episode_release_date_for_closure.clone();
-        let episode_artwork_for_closure = episode_artwork_for_closure.clone();
-        let episode_duration_for_closure = episode_duration_for_closure.clone();
-        let listen_duration_for_closure = listen_duration_for_closure.clone();
-        let episode_id_for_closure = episode_id_for_closure.clone();
-        web_sys::console::log_1(
-            &format!("on_play_click - is_youtube_vid: {:?}", is_youtube_vid).into(),
-        );
-        let episode_is_youtube = is_youtube_vid;
-        web_sys::console::log_1(
-            &format!("on_play_click - episode_is_youtube: {}", episode_is_youtube).into(),
-        );
         let api_key = api_key.clone();
         let user_id = user_id.clone();
         let server_name = server_name.clone();
         let audio_dispatch = audio_dispatch.clone();
 
         let episode_pos: f32 = 0.0;
-        let episode_id = episode_id_for_closure.clone();
-
-        let call_ep_url = episode_url_for_closure.clone();
         let check_server_name = server_name.clone();
         let check_api_key = api_key.clone();
         let check_user_id = user_id.clone();
-        let episode_title_for_wasm = episode_title_for_closure.clone();
-        let episode_description_for_wasm = episode_description_for_closure.clone();
-        let episode_release_date_for_wasm = episode_release_date_for_closure.clone();
-        let episode_url_for_wasm = call_ep_url.clone();
-        let episode_artwork_for_wasm = episode_artwork_for_closure.clone();
-        let episode_duration_for_wasm = episode_duration_for_closure.clone();
-        let episode_id_for_wasm = episode_id_for_closure.clone();
         let app_dispatch = audio_dispatch.clone();
-        let episode_url = episode_url_for_wasm.clone();
-        let episode_title = episode_title_for_wasm.clone();
 
-        web_sys::console::log_1(&JsValue::from_str(&episode_id_for_wasm.to_string()));
+        let title = episode.episodetitle.clone();
+        let url = episode.episodeurl.clone();
         spawn_local(async move {
             // Check if the episode exists in the database (your existing code)
             let mut episode_exists = call_check_episode_in_db(
                 &check_server_name.clone(),
                 &check_api_key.clone(),
                 check_user_id.clone(),
-                &episode_title.clone(),
-                &episode_url.clone(),
+                &title,
+                &url,
             )
             .await
             .unwrap_or(false);
 
-            let mut episode_id = episode_id_for_wasm;
-
             // If the episode exists but the current `episode_id` is `0`, retrieve the correct `episode_id`
-            if episode_exists && episode_id == 0 {
+            if episode_exists && episode.episodeid == 0 {
                 match call_get_episode_id(
                     &check_server_name,
                     &check_api_key,
                     &check_user_id,
-                    &episode_title,
-                    &episode_url,
-                    episode_is_youtube,
+                    &title,
+                    &url,
+                    episode.is_youtube,
                 )
                 .await
                 {
@@ -1646,7 +1564,7 @@ pub fn on_play_click(
                                 "New episode ID: {}",
                                 new_episode_id
                             )));
-                            episode_id = new_episode_id;
+                            episode.episodeid = new_episode_id;
                         }
                     }
                     Err(_) => {
@@ -1659,7 +1577,7 @@ pub fn on_play_click(
             }
             web_sys::console::log_1(&JsValue::from_str(&format!(
                 "post episode ID: {}",
-                episode_id
+                episode.episodeid
             )));
 
             web_sys::console::log_1(&JsValue::from_str(&format!(
@@ -1678,10 +1596,10 @@ pub fn on_play_click(
                 let history_api_key = check_api_key.clone();
 
                 let history_add = HistoryAddRequest {
-                    episode_id,
+                    episode_id: episode.episodeid,
                     episode_pos,
                     user_id,
-                    is_youtube: episode_is_youtube,
+                    is_youtube: episode.is_youtube,
                 };
 
                 let add_history_future =
@@ -1700,9 +1618,9 @@ pub fn on_play_click(
                 let queue_api_key = check_api_key.clone();
 
                 let request = QueuePodcastRequest {
-                    episode_id,
+                    episode_id: episode.episodeid,
                     user_id,
-                    is_youtube: episode_is_youtube,
+                    is_youtube: episode.is_youtube,
                 };
 
                 let queue_api = Option::from(queue_api_key);
@@ -1739,18 +1657,18 @@ pub fn on_play_click(
         });
 
         // Determine the source URL
-        let src = if episode_url_for_wasm.contains("youtube.com") {
+        let src = if episode.episodeurl.contains("youtube.com") {
             format!(
                 "{}/api/data/stream/{}?api_key={}&user_id={}&type=youtube",
-                server_name, episode_id, api_key, user_id
+                server_name, episode.episodeid, api_key, user_id
             )
-        } else if is_local.unwrap_or(false) {
+        } else if is_local {
             format!(
                 "{}/api/data/stream/{}?api_key={}&user_id={}",
-                server_name, episode_id, api_key, user_id
+                server_name, episode.episodeid, api_key, user_id
             )
         } else {
-            episode_url_for_wasm.clone()
+            episode.episodeurl.clone()
         };
 
         // NEW CODE: Analyze the actual audio duration before playing
@@ -1759,6 +1677,10 @@ pub fn on_play_click(
         let server_name_for_player = server_name.clone();
         let api_key_for_player = api_key.clone();
 
+        let title = episode.episodetitle.clone();
+        let description = episode.episodedescription.clone();
+        let pubdate = episode.episodepubdate.clone();
+        let artworkurl = episode.episodeartwork.clone();
         wasm_bindgen_futures::spawn_local(async move {
             // Function to get actual duration from audio file
             async fn get_actual_duration(audio_src: &str) -> Option<f64> {
@@ -1827,14 +1749,14 @@ pub fn on_play_click(
             let actual_duration_sec = get_actual_duration(&src_for_analysis).await;
 
             // Use the actual duration if available, otherwise fall back to provided duration
-            let final_duration_sec = actual_duration_sec.unwrap_or(episode_duration_for_wasm as f64);
+            let final_duration_sec = actual_duration_sec.unwrap_or(episode.episodeduration as f64);
 
             // Set actual duration in db
-            if (final_duration_sec as i32) != episode_duration_for_wasm {
+            if (final_duration_sec as i32) != episode.episodeduration {
                 let req = UpdateEpisodeDurationRequest {
-                    episode_id,
+                    episode_id: episode.episodeid,
                     new_duration: final_duration_sec as i32,
-                    is_youtube: episode_is_youtube,
+                    is_youtube: episode.is_youtube,
                 };
                 let _ = call_update_episode_duration(
                     &server_name_for_player,
@@ -1846,17 +1768,17 @@ pub fn on_play_click(
 
             web_sys::console::log_1(&JsValue::from_str(&format!(
                 "Original duration: {}s, Actual duration: {}s",
-                episode_duration_for_wasm, final_duration_sec
+                episode.episodeduration, final_duration_sec
             )));
 
             // Continue with the rest of your existing code...
-            if episode_id != 0 {
+            if episode.episodeid != 0 {
                 match call_get_podcast_id_from_ep(
                     &server_name_for_player,
                     &Some(api_key_for_player.clone()),
-                    episode_id,
+                    episode.episodeid,
                     user_id,
-                    Some(episode_is_youtube.clone()),
+                    Some(episode.is_youtube),
                 )
                 .await
                 {
@@ -1866,13 +1788,12 @@ pub fn on_play_click(
                             &Some(api_key_for_player.clone()),
                             user_id,
                             podcast_id,
-                            episode_is_youtube,
+                            episode.is_youtube,
                         )
                         .await
                         {
                             Ok((playback_speed, start_skip, end_skip)) => {
-                                let start_pos_sec =
-                                    listen_duration_for_closure.max(start_skip) as f64;
+                                let start_pos_sec = episode.listenduration.max(start_skip) as f64;
                                 let end_pos_sec = end_skip as f64;
 
                                 audio_dispatch_for_duration.reduce_mut(move |audio_state| {
@@ -1883,17 +1804,17 @@ pub fn on_play_click(
                                     audio_state.offline = Some(false);
                                     audio_state.currently_playing = Some(AudioPlayerProps {
                                         src: src.clone(),
-                                        title: episode_title_for_wasm.clone(),
-                                        description: episode_description_for_wasm.clone(),
-                                        release_date: episode_release_date_for_wasm.clone(),
-                                        artwork_url: episode_artwork_for_wasm.clone(),
+                                        title: title,
+                                        description: description,
+                                        release_date: pubdate,
+                                        artwork_url: artworkurl,
                                         duration: format!("{}", final_duration_sec as i32), // Use actual duration
-                                        episode_id: episode_id_for_wasm.clone(),
+                                        episode_id: episode.episodeid,
                                         duration_sec: final_duration_sec, // Use actual duration
                                         start_pos_sec,
                                         end_pos_sec: end_pos_sec as f64,
                                         offline: false,
-                                        is_youtube: episode_is_youtube.clone(),
+                                        is_youtube: episode.is_youtube,
                                     });
                                     audio_state.set_audio_source(src.to_string());
                                     if let Some(audio) = &audio_state.audio_element {
@@ -1926,17 +1847,17 @@ pub fn on_play_click(
                     audio_state.offline = Some(false);
                     audio_state.currently_playing = Some(AudioPlayerProps {
                         src: src.clone(),
-                        title: episode_title_for_wasm.clone(),
-                        description: episode_description_for_wasm.clone(),
-                        release_date: episode_release_date_for_wasm.clone(),
-                        artwork_url: episode_artwork_for_wasm.clone(),
+                        title: title,
+                        description: description,
+                        release_date: pubdate,
+                        artwork_url: artworkurl,
                         duration: format!("{}", final_duration_sec as i32), // Use actual duration
-                        episode_id: episode_id_for_wasm.clone(),
+                        episode_id: episode.episodeid,
                         duration_sec: final_duration_sec, // Use actual duration
                         start_pos_sec: 0.0,
                         end_pos_sec: 0.0,
                         offline: false,
-                        is_youtube: episode_is_youtube.clone(),
+                        is_youtube: episode.is_youtube,
                     });
                     audio_state.set_audio_source(src.to_string());
                     if let Some(audio) = &audio_state.audio_element {

@@ -2,7 +2,7 @@ use crate::components::app_drawer::App_drawer;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState};
 use i18nrs::yew::use_translation;
-use crate::components::feed::VirtualList;
+use crate::components::virtual_list::VirtualList;
 use crate::components::gen_components::{Search_nav, UseScrollToTop};
 use crate::requests::pod_req;
 use yew::prelude::*;

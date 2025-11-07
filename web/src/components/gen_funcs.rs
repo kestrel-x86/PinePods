@@ -238,18 +238,19 @@ pub fn parse_opml(opml_content: &str) -> Vec<(String, String)> {
 }
 
 /// Format time in seconds to HH:MM:SS
-pub fn format_time(time_in_seconds: f64) -> String {
-    let hours = (time_in_seconds / 3600.0).floor() as i32;
-    let minutes = ((time_in_seconds % 3600.0) / 60.0).floor() as i32;
-    let seconds = (time_in_seconds % 60.0).floor() as i32;
+pub fn format_time(time_in_seconds: i32) -> String {
+    // regular integer division rounds toward zero
+    let hours = time_in_seconds / 3600;
+    let minutes = (time_in_seconds % 3600) / 60;
+    let seconds = time_in_seconds % 60;
     format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
 }
 
 /// Format time in seconds to HH:MM:SS or MM:SS if hours is 0
-pub fn format_time_rm_hour(time_in_seconds: f64) -> String {
-    let hours = (time_in_seconds / 3600.0).floor() as i32;
-    let minutes = ((time_in_seconds % 3600.0) / 60.0).floor() as i32;
-    let seconds = (time_in_seconds % 60.0).floor() as i32;
+pub fn format_time_rm_hour(time_in_seconds: i32) -> String {
+    let hours = time_in_seconds / 3600;
+    let minutes = (time_in_seconds % 3600) / 60;
+    let seconds = time_in_seconds % 60;
 
     if hours > 0 {
         format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
@@ -260,9 +261,8 @@ pub fn format_time_rm_hour(time_in_seconds: f64) -> String {
 
 /// Format time in minutes to HH:MM
 pub fn format_time_mins(time_in_minutes: i32) -> String {
-    let time_in_minutes = time_in_minutes as f64;
-    let hours = (time_in_minutes / 60.0).floor() as i32;
-    let minutes = (time_in_minutes % 60.0).floor() as i32;
+    let hours = time_in_minutes / 60;
+    let minutes = time_in_minutes % 60;
     format!("{:02}:{:02}", hours, minutes)
 }
 

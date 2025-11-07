@@ -1,6 +1,5 @@
 use super::app_drawer::App_drawer;
 use super::gen_components::{empty_message, on_shownotes_click, Search_nav, UseScrollToTop};
-use crate::components::audio::on_play_pause;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState};
 use crate::components::episode_list_item::EpisodeListItem;
@@ -8,6 +7,7 @@ use crate::components::episodes_layout::AppStateMsg;
 use crate::components::gen_funcs::{
     format_datetime, match_date_format, parse_date, sanitize_html_with_blank_target,
 };
+use crate::components::virtual_list::DragCallbacks;
 use crate::requests::pod_req::QueuedEpisodesResponse;
 use crate::requests::pod_req::{self, Episode};
 use gloo_events::EventListener;
@@ -238,177 +238,237 @@ pub struct VirtualQueueListProps {
 
 #[function_component(VirtualQueueList)]
 pub fn virtual_queue_list(props: &VirtualQueueListProps) -> Html {
-    let scroll_pos = use_state(|| 0.0);
-    let container_ref = use_node_ref();
-    let container_height = use_state(|| 0.0);
-    let item_height = use_state(|| 234.0); // Default item height
-    let force_update = use_state(|| 0);
+    let (state, dispatch) = use_store::<AppState>();
+    let (post_state, _post_dispatch) = use_store::<AppState>();
+    let (audio_state, audio_dispatch) = use_store::<UIState>();
+    let server_name = post_state
+        .auth_details
+        .as_ref()
+        .map(|ud| ud.server_name.clone());
+    let api_key = post_state
+        .auth_details
+        .as_ref()
+        .map(|ud| ud.api_key.clone());
+    let user_id = post_state.user_details.as_ref().map(|ud| ud.UserID.clone());
+    let history = BrowserHistory::new();
 
-    // Shared drag state for all episodes
-    let dragging = use_state(|| None::<i32>);
+    let dragging_state = use_state(|| None::<i32>);
+    let is_dragging = use_state(|| false);
 
-    // Effect to set initial container height, item height, and listen for window resize
-    {
-        let container_height = container_height.clone();
-        let item_height = item_height.clone();
-        let force_update = force_update.clone();
+    let ondragstart = {
+        let dragging = dragging_state.clone();
+        Callback::from(move |e: DragEvent| {
+            web_sys::console::log_1(&"Desktop ondragstart triggered".into());
+            let target = e.target().unwrap();
+            let id = target
+                .dyn_ref::<HtmlElement>()
+                .unwrap()
+                .get_attribute("data-id")
+                .unwrap();
+            let parsed_id = id.parse::<i32>().unwrap();
+            web_sys::console::log_1(&format!("Setting dragging state to: {}", parsed_id).into());
+            dragging.set(Some(parsed_id));
+            e.data_transfer()
+                .unwrap()
+                .set_data("text/plain", &id)
+                .unwrap();
+            e.data_transfer().unwrap().set_effect_allowed("move");
+        })
+    };
 
-        use_effect_with((), move |_| {
-            let window = window().expect("no global `window` exists");
-            let window_clone = window.clone();
+    let ondragenter = Callback::from(|e: DragEvent| {
+        e.prevent_default();
+        e.data_transfer().unwrap().set_drop_effect("move");
+    });
 
-            let update_sizes = Callback::from(move |_| {
-                let height = window_clone.inner_height().unwrap().as_f64().unwrap();
-                container_height.set(height - 100.0);
+    let ondragover = Callback::from(move |e: DragEvent| {
+        e.prevent_default();
+        let y = e.client_y();
+        let scroll_speed = 20;
 
-                let width = window_clone.inner_width().unwrap().as_f64().unwrap();
-                let new_item_height = calculate_item_height(width);
+        // Find the virtual list container to scroll it instead of the window
+        if let Some(document) = web_sys::window().and_then(|w| w.document()) {
+            if let Ok(Some(container)) = document.query_selector(".virtual-list-container") {
+                if let Some(container_element) = container.dyn_ref::<web_sys::HtmlElement>() {
+                    let container_rect = container_element.get_bounding_client_rect();
+                    let container_top = container_rect.top();
+                    let container_bottom = container_rect.bottom();
 
-                web_sys::console::log_1(
-                    &format!(
-                        "Virtual list: width={}, item_height={}",
-                        width, new_item_height
-                    )
-                    .into(),
-                );
-                item_height.set(new_item_height);
-                force_update.set(*force_update + 1);
-            });
-
-            update_sizes.emit(());
-
-            let listener = EventListener::new(&window, "resize", move |_| {
-                update_sizes.emit(());
-            });
-
-            move || drop(listener)
-        });
-    }
-
-    // Effect for scroll handling - prevent feedback loop with debouncing
-    {
-        let scroll_pos = scroll_pos.clone();
-        let container_ref = container_ref.clone();
-        use_effect_with(container_ref.clone(), move |container_ref| {
-            if let Some(container) = container_ref.cast::<HtmlElement>() {
-                let scroll_pos_clone = scroll_pos.clone();
-                let is_updating = std::rc::Rc::new(std::cell::RefCell::new(false));
-
-                let scroll_listener = EventListener::new(&container, "scroll", move |event| {
-                    // Prevent re-entrant calls that cause feedback loops
-                    if *is_updating.borrow() {
-                        return;
+                    // Scroll up if cursor is near the top of the container
+                    if (y as f64) < container_top + 50.0 {
+                        container_element
+                            .set_scroll_top((container_element.scroll_top() - scroll_speed).max(0));
                     }
 
-                    if let Some(target) = event.target() {
-                        if let Ok(element) = target.dyn_into::<Element>() {
-                            let new_scroll_top = element.scroll_top() as f64;
-                            let old_scroll_top = *scroll_pos_clone;
+                    // Scroll down if cursor is near the bottom of the container
+                    if (y as f64) > container_bottom - 50.0 {
+                        container_element
+                            .set_scroll_top(container_element.scroll_top() + scroll_speed);
+                    }
+                }
+            }
+        }
+    });
 
-                            // Only update if there's a significant change
-                            if (new_scroll_top - old_scroll_top).abs() >= 5.0 {
-                                *is_updating.borrow_mut() = true;
+    let ondrop = {
+        let dragging = dragging_state.clone();
+        let dispatch = dispatch.clone();
+        let all_episodes = props.episodes.clone();
+        let server_name = server_name.clone();
+        let api_key = api_key.clone();
+        let user_id = user_id.clone();
+        Callback::from(move |e: DragEvent| {
+            e.prevent_default();
 
-                                // Use requestAnimationFrame to batch updates and prevent feedback
-                                let scroll_pos_clone2 = scroll_pos_clone.clone();
-                                let is_updating_clone = is_updating.clone();
-                                let callback =
-                                    wasm_bindgen::closure::Closure::wrap(Box::new(move || {
-                                        scroll_pos_clone2.set(new_scroll_top);
-                                        *is_updating_clone.borrow_mut() = false;
-                                    })
-                                        as Box<dyn FnMut()>);
+            web_sys::console::log_1(&"Desktop ondrop triggered".into());
 
-                                web_sys::window()
+            if let Some(dragged_id) = *dragging {
+                web_sys::console::log_1(&format!("Dragged ID: {}", dragged_id).into());
+
+                let mut target_index = None;
+
+                // First try to find a visible target element
+                let mut target = e.target().unwrap().dyn_into::<web_sys::Element>().unwrap();
+                let mut attempts = 0;
+                while !target.has_attribute("data-id")
+                    && target.parent_element().is_some()
+                    && attempts < 10
+                {
+                    target = target.parent_element().unwrap();
+                    attempts += 1;
+                }
+
+                if let Some(target_id_str) = target.get_attribute("data-id") {
+                    web_sys::console::log_1(
+                        &format!("Found target element with ID: {}", target_id_str).into(),
+                    );
+                    if let Ok(target_id) = target_id_str.parse::<i32>() {
+                        if target_id != dragged_id {
+                            target_index =
+                                all_episodes.iter().position(|x| x.episodeid == target_id);
+                        }
+                    }
+                } else {
+                    // No visible target found - calculate virtual drop position using mouse coordinates
+                    web_sys::console::log_1(
+                        &"No visible target found, calculating virtual position".into(),
+                    );
+                    let client_y = e.client_y() as f64;
+
+                    if let Some(document) = web_sys::window().and_then(|w| w.document()) {
+                        if let Ok(Some(container)) =
+                            document.query_selector(".virtual-list-container")
+                        {
+                            if let Some(container_element) =
+                                container.dyn_ref::<web_sys::HtmlElement>()
+                            {
+                                let container_rect = container_element.get_bounding_client_rect();
+                                let scroll_top = container_element.scroll_top() as f64;
+
+                                // Calculate which episode index the drop position corresponds to
+                                // Use responsive item height calculation
+                                let window_width = web_sys::window()
                                     .unwrap()
-                                    .request_animation_frame(callback.as_ref().unchecked_ref())
+                                    .inner_width()
+                                    .unwrap()
+                                    .as_f64()
                                     .unwrap();
-                                callback.forget();
+                                let item_height = calculate_item_height(window_width);
+                                let relative_y = (client_y - container_rect.top()) + scroll_top;
+                                let virtual_index = (relative_y / item_height).floor() as usize;
+
+                                web_sys::console::log_1(
+                                    &format!("Virtual drop index calculated: {}", virtual_index)
+                                        .into(),
+                                );
+
+                                // Clamp to valid range
+                                target_index =
+                                    Some(virtual_index.min(all_episodes.len().saturating_sub(1)));
                             }
                         }
                     }
-                });
+                }
 
-                Box::new(move || {
-                    drop(scroll_listener);
-                }) as Box<dyn FnOnce()>
+                // Perform the reorder if we have a valid target
+                if let Some(target_idx) = target_index {
+                    web_sys::console::log_1(
+                        &format!(
+                            "Reordering: dragged {} to position {}",
+                            dragged_id, target_idx
+                        )
+                        .into(),
+                    );
+
+                    let mut episodes_vec = all_episodes.clone();
+                    if let Some(dragged_index) =
+                        episodes_vec.iter().position(|x| x.episodeid == dragged_id)
+                    {
+                        if dragged_index != target_idx {
+                            // Remove and reinsert at the correct position
+                            let dragged_item = episodes_vec.remove(dragged_index);
+                            let insert_idx = if dragged_index < target_idx {
+                                target_idx
+                            } else {
+                                target_idx
+                            };
+                            episodes_vec.insert(insert_idx.min(episodes_vec.len()), dragged_item);
+
+                            web_sys::console::log_1(&"Calling reorder queue API".into());
+
+                            // Extract episode IDs
+                            let episode_ids: Vec<i32> =
+                                episodes_vec.iter().map(|ep| ep.episodeid).collect();
+
+                            dispatch.reduce_mut(|state| {
+                                state.queued_episodes = Some(QueuedEpisodesResponse {
+                                    episodes: episodes_vec.clone(),
+                                });
+                            });
+
+                            // Make a backend call to update the order on the server side
+                            let server_name = server_name.clone();
+                            let api_key = api_key.clone();
+                            let user_id = user_id.clone();
+                            wasm_bindgen_futures::spawn_local(async move {
+                                if let Err(err) = pod_req::call_reorder_queue(
+                                    &server_name.unwrap(),
+                                    &api_key.unwrap(),
+                                    &user_id.unwrap(),
+                                    &episode_ids,
+                                )
+                                .await
+                                {
+                                    web_sys::console::log_1(
+                                        &format!("Failed to update order on server: {:?}", err)
+                                            .into(),
+                                    );
+                                } else {
+                                    web_sys::console::log_1(
+                                        &"Reorder queue API call successful".into(),
+                                    );
+                                }
+                            });
+                        } else {
+                            web_sys::console::log_1(&"Same position, no reorder needed".into());
+                        }
+                    }
+                } else {
+                    web_sys::console::log_1(&"No valid target index found".into());
+                }
             } else {
-                Box::new(|| {}) as Box<dyn FnOnce()>
+                web_sys::console::log_1(&"No dragged ID found".into());
             }
-        });
-    }
 
-    let start_index = (*scroll_pos / *item_height).floor() as usize;
-    let visible_count = ((*container_height / *item_height).ceil() as usize) + 1;
-    let end_index = (start_index + visible_count).min(props.episodes.len());
-
-    // Debug logging to see what's happening
-    web_sys::console::log_1(&format!(
-        "Virtual list debug: scroll_pos={}, item_height={}, container_height={}, start_index={}, visible_count={}, end_index={}, total_episodes={}",
-        *scroll_pos, *item_height, *container_height, start_index, visible_count, end_index, props.episodes.len()
-    ).into());
-
-    let visible_episodes = (start_index..end_index)
-        .map(|index| {
-            let episode = props.episodes[index].clone();
-            html! {
-                <QueueEpisode
-                    key={format!("{}-{}", episode.episodeid, *force_update)}
-                    episode={episode.clone()}
-                    all_episodes={props.episodes.clone()}
-                    dragging={dragging.clone()}
-                />
-            }
+            dragging.set(None);
         })
-        .collect::<Html>();
-
-    let total_height = props.episodes.len() as f64 * *item_height;
-    let offset_y = start_index as f64 * *item_height;
-
-    // Debug the offset calculation specifically
-    web_sys::console::log_1(
-        &format!(
-            "Offset debug: total_height={}, offset_y={}, start_index={}",
-            total_height, offset_y, start_index
-        )
-        .into(),
-    );
+    };
 
     html! {
-        <div
-            ref={container_ref}
-            class="virtual-list-container flex-grow overflow-y-auto"
-            style="height: calc(100vh - 100px); -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain;"
-        >
-            // Top spacer to push content down without using transforms
-            <div style={format!("height: {}px; flex-shrink: 0;", offset_y)}></div>
-
-            // Visible episodes
-            <div>
-                { visible_episodes }
-            </div>
-
-            // Bottom spacer to maintain total height
-            <div style={format!("height: {}px; flex-shrink: 0;", total_height - offset_y - (end_index - start_index) as f64 * *item_height)}></div>
-        </div>
-    }
-}
-
-#[derive(Properties, PartialEq, Clone)]
-pub struct QueueEpisodeProps {
-    pub episode: Episode,
-    pub all_episodes: Vec<Episode>,
-    pub dragging: UseStateHandle<Option<i32>>,
-}
-
-#[function_component(QueueEpisode)]
-pub fn queue_episode(props: &QueueEpisodeProps) -> Html {
-    html! { // FIX: drag/drop functionality
-        <EpisodeListItem
-            episode={ props.episode.clone() }
+        <crate::components::virtual_list::VirtualList
+            episodes={ props.episodes.clone() }
             page_type={ "queue" }
-            on_checkbox_change={ Callback::noop() }
-            is_delete_mode={ false }
-        />
+            drag_callbacks={ DragCallbacks{ ondragstart: Some(ondragstart), ondragenter: Some(ondragenter), ondragover: Some(ondragover), ondrop: Some(ondrop) } }
+            />
     }
 }

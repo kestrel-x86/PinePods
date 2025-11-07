@@ -191,7 +191,7 @@ pub fn shared_episode(_props: &SharedProps) -> Html {
 
                         let datetime = parse_date(&episode.episode.episodepubdate, &state.user_tz);
                         let date_format = match_date_format(state.date_format.as_deref());
-                        let format_duration = format_time(episode.episode.episodeduration as f64);
+                        let format_duration = format_time(episode.episode.episodeduration);
                         let format_release = format!("{}", format_datetime(&datetime, &state.hour_preference, date_format));
 
                         let open_in_new_tab = Callback::from(move |url: String| {
