@@ -216,12 +216,12 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
                     on_shownotes_click(
                         history.clone(),
                         search_dispatch.clone(),
-                        Some(episode_id),
-                        Some(podcast_link.clone()),
-                        Some(episode_url.clone()),
-                        Some(podcast_title.clone()),
+                        episode_id,
+                        podcast_link.clone(),
+                        episode_url.clone(),
+                        podcast_title.clone(),
                         true,
-                        None,
+                        false,
                         is_youtube.clone()
                     ).emit(MouseEvent::new("click").unwrap());
                 })
@@ -474,12 +474,12 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
                         on_shownotes_click(
                             history.clone(),
                             search_dispatch.clone(),
-                            Some(episode_id),
-                            Some(podcast_link.clone()),
-                            Some(episode_url.clone()),
-                            Some(podcast_title.clone()),
+                            episode_id,
+                            podcast_link.clone(),
+                            episode_url.clone(),
+                            podcast_title.clone(),
                             true,
-                            None,
+                            false,
                             is_youtube,
                         ).emit(MouseEvent::new("click").unwrap());
                     })

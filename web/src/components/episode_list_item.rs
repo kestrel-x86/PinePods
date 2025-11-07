@@ -143,15 +143,27 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
         format_datetime(&datetime, &state.hour_preference, date_format)
     };
 
-    let api_key = state.auth_details.as_ref().map(|ud| ud.api_key.clone());
-    let user_id = state.user_details.as_ref().map(|ud| ud.UserID.clone());
-    let server_name = state.auth_details.as_ref().map(|ud| ud.server_name.clone());
+    let api_key = state
+        .auth_details
+        .as_ref()
+        .map(|ud| ud.api_key.clone().unwrap())
+        .unwrap();
+    let user_id = state
+        .user_details
+        .as_ref()
+        .map(|ud| ud.UserID.clone())
+        .unwrap();
+    let server_name = state
+        .auth_details
+        .as_ref()
+        .map(|ud| ud.server_name.clone())
+        .unwrap();
 
     let on_play_pause = on_play_pause(
         props.episode.clone(),
-        api_key.unwrap().unwrap(),
-        user_id.unwrap(),
-        server_name.unwrap(),
+        api_key.clone(),
+        user_id.clone(),
+        server_name.clone(),
         audio_dispatch.clone(),
         audio_state.clone(),
         false,
@@ -252,15 +264,44 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
     */
     let browser_history = BrowserHistory::new();
     let on_shownotes_click = {
+        let check_episode_id = props.episode.episodeid;
+        #[cfg(feature = "server_build")]
+        let is_local = state
+            .downloaded_episode_ids
+            .as_ref()
+            .unwrap_or(&vec![])
+            .contains(&check_episode_id.clone());
+
+        #[cfg(not(feature = "server_build"))]
+        let is_local = state
+            .locally_downloaded_episodes
+            .as_ref()
+            .unwrap_or(&vec![])
+            .contains(&check_episode_id.clone());
+
+        let src = if props.episode.episodeurl.contains("youtube.com") {
+            format!(
+                "{}/api/data/stream/{}?api_key={}&user_id={}&type=youtube",
+                server_name, props.episode.episodeid, api_key, user_id
+            )
+        } else if is_local {
+            format!(
+                "{}/api/data/stream/{}?api_key={}&user_id={}",
+                server_name, props.episode.episodeid, api_key, user_id
+            )
+        } else {
+            props.episode.episodeurl.clone()
+        };
+
         on_shownotes_click(
             browser_history.clone(),
             app_dispatch.clone(),
-            Some(props.episode.episodeid.clone()),
-            Some(props.page_type.clone()), // todo: fix these
-            Some(props.page_type.clone()),
-            Some(props.page_type.clone()),
+            props.episode.episodeid.clone(),
+            props.episode.episodeurl.clone(),
+            src,
+            props.episode.episodetitle.clone(),
             true,
-            None,
+            false,
             props.episode.is_youtube,
         )
     };

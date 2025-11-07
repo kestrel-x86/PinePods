@@ -1710,12 +1710,12 @@ pub fn empty_message(header: &str, paragraph: &str) -> Html {
 pub fn on_shownotes_click(
     history: BrowserHistory,
     dispatch: Dispatch<AppState>,
-    episode_id: Option<i32>,
-    shownotes_episode_url: Option<String>,
-    episode_audio_url: Option<String>,
-    podcast_title: Option<String>,
+    episode_id: i32,
+    shownotes_episode_url: String,
+    episode_audio_url: String,
+    podcast_title: String,
     _db_added: bool,
-    person_episode: Option<bool>,
+    person_episode: bool,
     is_youtube: bool,
 ) -> Callback<MouseEvent> {
     Callback::from(move |_: MouseEvent| {
@@ -1725,18 +1725,18 @@ pub fn on_shownotes_click(
 
         let show_notes = shownotes_episode_url.clone();
         let ep_aud = episode_audio_url.clone();
-        let pod_tit = podcast_title.clone();
+        let pod_title = podcast_title.clone();
 
         let dispatch_clone = dispatch.clone();
         let history_clone = history.clone();
 
         wasm_bindgen_futures::spawn_local(async move {
             dispatch_clone.reduce_mut(move |state| {
-                state.selected_episode_id = episode_id;
-                state.selected_episode_url = show_notes;
-                state.selected_episode_audio_url = ep_aud;
-                state.selected_podcast_title = pod_tit;
-                state.person_episode = person_episode;
+                state.selected_episode_id = Some(episode_id);
+                state.selected_episode_url = Some(show_notes);
+                state.selected_episode_audio_url = Some(ep_aud);
+                state.selected_podcast_title = Some(pod_title);
+                state.person_episode = Some(person_episode);
                 state.selected_is_youtube = is_youtube;
                 state.fetched_episode = None;
             });
