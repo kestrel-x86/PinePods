@@ -9,7 +9,7 @@ use crate::components::gen_funcs::{
 use crate::components::gen_funcs::{format_time, strip_images_from_html};
 use crate::components::safehtml::SafeHtml;
 use crate::components::virtual_list::DragCallbacks;
-use crate::requests::pod_req::Episode;
+use crate::requests::episode::Episode;
 use gloo::history::BrowserHistory;
 use gloo_events::EventListener;
 use wasm_bindgen::prelude::*;

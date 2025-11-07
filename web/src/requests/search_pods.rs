@@ -1,4 +1,4 @@
-use crate::{components::podcast_layout::ClickedFeedURL, requests::pod_req::Episode};
+use crate::{components::podcast_layout::ClickedFeedURL, requests::episode::Episode};
 use anyhow::Error;
 use chrono::DateTime;
 use gloo_net::http::Request;
@@ -637,7 +637,6 @@ pub struct SearchRequest {
 pub struct SearchResponse {
     pub data: Vec<Episode>,
 }
-
 
 #[allow(dead_code)]
 pub async fn call_search_database(

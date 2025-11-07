@@ -2,15 +2,17 @@ use crate::components::audio::AudioPlayerProps;
 use crate::components::notification_center::TaskProgress;
 use crate::components::podcast_layout::ClickedFeedURL;
 use crate::components::podcasts::PodcastLayout;
+use crate::requests::episode::Episode;
 use crate::requests::login_requests::AddUserRequest;
 use crate::requests::login_requests::GetUserDetails;
 use crate::requests::login_requests::LoginServerRequest;
 use crate::requests::login_requests::{GetApiDetails, TimeZoneInfo};
 use crate::requests::pod_req::PodcastResponseExtra;
+
 use crate::requests::pod_req::{
-    Chapter, Episode, EpisodeDownloadResponse, EpisodeMetadataResponse, Funding,
-    HistoryDataResponse, HomeOverview, Person, Playlist, PlaylistInfo, Podcast, PodcastResponse,
-    PodrollItem, QueuedEpisodesResponse, RecentEps, RefreshProgress, SavedEpisodesResponse,
+    Chapter, EpisodeDownloadResponse, EpisodeMetadataResponse, Funding, HistoryDataResponse,
+    HomeOverview, Person, Playlist, PlaylistInfo, Podcast, PodcastResponse, PodrollItem,
+    QueuedEpisodesResponse, RecentEps, RefreshProgress, SavedEpisodesResponse,
     SharedEpisodeResponse, Transcript, Value,
 };
 use crate::requests::search_pods::{

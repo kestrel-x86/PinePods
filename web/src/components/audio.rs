@@ -3,6 +3,8 @@ use crate::components::context::{AppState, UIState};
 use crate::components::downloads_tauri::start_local_file_server;
 use crate::components::gen_components::{EpisodeModal, FallbackImage};
 use crate::components::gen_funcs::format_time_rm_hour;
+use crate::requests::episode::Episode;
+use crate::requests::pod_req::call_get_episode_id;
 use crate::requests::pod_req::FetchPodcasting2DataRequest;
 use crate::requests::pod_req::{
     call_add_history, call_check_episode_in_db, call_fetch_podcasting_2_data,
@@ -12,7 +14,6 @@ use crate::requests::pod_req::{
     call_update_episode_duration, HistoryAddRequest, MarkEpisodeCompletedRequest,
     QueuePodcastRequest, RecordListenDurationRequest, UpdateEpisodeDurationRequest,
 };
-use crate::requests::pod_req::{call_get_episode_id, Episode};
 use gloo_timers::callback::Interval;
 use i18nrs::yew::use_translation;
 use std::cell::Cell;

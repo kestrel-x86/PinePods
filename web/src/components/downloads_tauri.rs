@@ -4,8 +4,10 @@ use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
 
 use crate::components::episode_list_item::EpisodeListItem;
+use crate::requests::episode::Episode;
+
 use crate::requests::pod_req::{
-    Episode, EpisodeDownloadResponse, EpisodeInfo, Podcast, PodcastDetails, PodcastResponse,
+    EpisodeDownloadResponse, EpisodeInfo, Podcast, PodcastDetails, PodcastResponse,
 };
 use i18nrs::yew::use_translation;
 use serde::{Deserialize, Serialize};

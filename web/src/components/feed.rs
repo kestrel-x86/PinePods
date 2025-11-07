@@ -5,7 +5,9 @@ use crate::components::context::{AppState, UIState};
 use crate::components::episode_list_item::EpisodeListItem;
 use crate::components::virtual_list::VirtualList;
 use crate::requests::pod_req;
-use crate::requests::pod_req::Episode as EpisodeData;
+use crate::requests::episode::Episode;
+
+
 use crate::requests::pod_req::RecentEps;
 use gloo::events::EventListener;
 use i18nrs::yew::use_translation;

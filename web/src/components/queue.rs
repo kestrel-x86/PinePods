@@ -7,9 +7,11 @@ use crate::components::episodes_layout::AppStateMsg;
 use crate::components::gen_funcs::{
     format_datetime, match_date_format, parse_date, sanitize_html_with_blank_target,
 };
+use crate::requests::episode::Episode;
+
 use crate::components::virtual_list::DragCallbacks;
 use crate::requests::pod_req::QueuedEpisodesResponse;
-use crate::requests::pod_req::{self, Episode};
+use crate::requests::pod_req::{self};
 use gloo_events::EventListener;
 use gloo_utils::document;
 use i18nrs::yew::use_translation;

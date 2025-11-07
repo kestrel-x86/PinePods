@@ -9,8 +9,10 @@ use crate::components::episode_list_item::EpisodeListItem;
 use crate::components::gen_components::on_shownotes_click;
 use crate::components::gen_components::ContextButton;
 use crate::components::gen_funcs::{format_datetime, format_time, match_date_format, parse_date};
+use crate::requests::episode::Episode;
 use crate::requests::pod_req::Playlist;
-use crate::requests::pod_req::{self, Episode};
+use crate::requests::pod_req::{self};
+
 use i18nrs::yew::use_translation;
 use yew::prelude::*;
 use yew_router::history::{BrowserHistory, History};

@@ -2,7 +2,7 @@ use anyhow::Error;
 use gloo::net::http::Request;
 use serde::Deserialize;
 
-use crate::requests::pod_req::Episode;
+use crate::requests::episode::Episode;
 
 #[derive(Deserialize, Clone, PartialEq, Debug)]
 pub struct PersonSubscription {

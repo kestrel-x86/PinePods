@@ -3,6 +3,8 @@ use crate::components::context::{AppState, UIState};
 use crate::components::downloads_tauri::{
     download_file, remove_episode_from_local_db, update_local_database, update_podcast_database,
 };
+use crate::requests::episode::Episode;
+
 use crate::components::gen_funcs::format_error_message;
 use crate::components::gen_funcs::format_time;
 use crate::components::notification_center::{NotificationCenter, ToastNotification};
@@ -10,7 +12,7 @@ use crate::components::safehtml::SafeHtml;
 use crate::requests::pod_req::{
     call_download_episode, call_mark_episode_completed, call_mark_episode_uncompleted,
     call_queue_episode, call_remove_downloaded_episode, call_remove_queued_episode,
-    call_remove_saved_episode, call_save_episode, DownloadEpisodeRequest, Episode,
+    call_remove_saved_episode, call_save_episode, DownloadEpisodeRequest,
     MarkEpisodeCompletedRequest, QueuePodcastRequest, QueuedEpisode, SavePodcastRequest,
 };
 #[cfg(not(feature = "server_build"))]

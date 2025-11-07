@@ -6,8 +6,11 @@ use crate::components::context::{AppState, ExpandedDescriptions, UIState};
 use crate::components::episode_list_item::EpisodeListItem;
 use crate::requests::pod_req::{
     call_bulk_delete_downloaded_episodes, call_get_episode_downloads, call_get_podcasts,
-    BulkEpisodeActionRequest, Episode, EpisodeDownloadResponse, Podcast, PodcastResponse,
+    BulkEpisodeActionRequest, EpisodeDownloadResponse, Podcast, PodcastResponse,
 };
+use crate::requests::episode::Episode;
+
+
 use i18nrs::yew::use_translation;
 use std::borrow::Borrow;
 use std::collections::HashMap;
