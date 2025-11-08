@@ -110,7 +110,7 @@ pub fn saved() -> Html {
                                     .collect();
 
                                 dispatch.reduce_mut(move |state| {
-                                    state.saved_episodes = Some(fetched_episodes);
+                                    state.saved_episodes = fetched_episodes;
                                     state.completed_episodes = Some(completed_episode_ids);
                                 });
 
@@ -154,8 +154,8 @@ pub fn saved() -> Html {
             show_in_progress.clone(),
         ),
         |(saved_eps, search, sort_dir, show_completed, show_in_progress)| {
-            if let Some(saved_episodes) = saved_eps {
-                let mut filtered = saved_episodes
+            if saved_eps.len() > 0 {
+                let mut filtered = saved_eps
                     .iter()
                     .filter(|episode| {
                         // Search filter
@@ -354,7 +354,7 @@ pub fn saved() -> Html {
                             </div>
 
                             {
-                                if let Some(_saved_eps) = state.saved_episodes.clone() {
+                                if state.saved_episodes.len() > 0 {
                                     if (*filtered_episodes).is_empty() {
                                         empty_message(
                                             &i18n.t("saved.no_saved_episodes"),

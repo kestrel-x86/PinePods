@@ -969,8 +969,8 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
                         let formatted_info = format_error_message(&success_message.to_string());
                         post_state.reduce_mut(|state| {
                             state.info_message = Option::from(format!("{}", formatted_info));
-                            if let Some(ref mut saved_episodes) = state.saved_episode_ids {
-                                saved_episodes.push(episode_clone.get_episode_id(Some(0)));
+                            if !state.saved_episode_ids().contains(&episode.episodeid) {
+                                state.saved_episodes.push(ep);
                             }
                         });
                     }
@@ -1014,15 +1014,9 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
 
                         // queue_post.reduce_mut(|state| state.info_message = Option::from(format!("{}", success_message)));
                         post_dispatch.reduce_mut(|state| {
-                            // Here, you should remove the episode from the saved_episodes
-                            if let Some(ref mut saved_episodes) = state.saved_episodes {
-                                saved_episodes
-                                    .retain(|ep| ep.get_episode_id(Some(0)) != episode_id);
-                            }
-                            if let Some(ref mut saved_episode_ids) = state.saved_episode_ids {
-                                saved_episode_ids.retain(|&id| id != episode_id);
-                            }
-                            // Optionally, you can update the info_message with success message
+                            state
+                                .saved_episodes
+                                .retain(|e| e.episodeid != episode.episodeid);
                             state.info_message = Some(format!("{}", formatted_info).to_string());
                         });
                     }
@@ -1041,10 +1035,9 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
     };
 
     let is_saved = post_state
-        .saved_episode_ids
-        .as_ref()
-        .unwrap_or(&vec![])
-        .contains(&check_episode_id.clone());
+        .saved_episodes
+        .iter()
+        .any(|e| e.episodeid == check_episode_id);
 
     let on_toggle_save = {
         let on_save_episode = on_save_episode.clone();

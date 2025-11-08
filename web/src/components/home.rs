@@ -131,10 +131,10 @@ pub fn home() -> Html {
                                     .map(|ep| ep.episodeid)
                                     .collect();
 
-                                let saved_episode_ids: Vec<i32> = all_episodes
+                                let saved_episodes: Vec<Episode> = all_episodes
                                     .clone()
                                     .filter(|ep| ep.saved)
-                                    .map(|ep| ep.episodeid)
+                                    .map(|e| e.to_owned())
                                     .collect();
 
                                 let queued_episode_ids: Vec<i32> = all_episodes
@@ -154,7 +154,7 @@ pub fn home() -> Html {
 
                                     // Update state collections with merged data
                                     state.completed_episodes = Some(completed_episode_ids);
-                                    state.saved_episode_ids = Some(saved_episode_ids);
+                                    state.saved_episodes = saved_episodes;
                                     state.queued_episode_ids = Some(queued_episode_ids);
                                     state.downloaded_episode_ids = Some(downloaded_episode_ids);
                                 });

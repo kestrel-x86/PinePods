@@ -4,9 +4,8 @@ use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState};
 use crate::components::episode_list_item::EpisodeListItem;
 use crate::components::virtual_list::VirtualList;
-use crate::requests::pod_req;
 use crate::requests::episode::Episode;
-
+use crate::requests::pod_req;
 
 use crate::requests::pod_req::RecentEps;
 use gloo::events::EventListener;
@@ -92,10 +91,10 @@ pub fn feed() -> Html {
                                     .filter(|ep| ep.completed)
                                     .map(|ep| ep.episodeid)
                                     .collect();
-                                let saved_episode_ids: Vec<i32> = fetched_episodes
+                                let saved_episodes: Vec<Episode> = fetched_episodes
                                     .iter()
                                     .filter(|ep| ep.saved)
-                                    .map(|ep| ep.episodeid)
+                                    .map(|e| e.clone())
                                     .collect();
                                 let queued_episode_ids: Vec<i32> = fetched_episodes
                                     .iter()
@@ -112,7 +111,7 @@ pub fn feed() -> Html {
                                         episodes: Some(fetched_episodes),
                                     });
                                     state.completed_episodes = Some(completed_episode_ids);
-                                    state.saved_episode_ids = Some(saved_episode_ids);
+                                    state.saved_episodes = saved_episodes;
                                     state.queued_episode_ids = Some(queued_episode_ids);
                                     state.downloaded_episode_ids = Some(downloaded_episode_ids);
                                 });

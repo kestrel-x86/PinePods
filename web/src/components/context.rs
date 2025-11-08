@@ -104,7 +104,8 @@ pub struct AppState {
     pub people_feed_results: Option<PeopleFeedResult>,
     pub server_feed_results: Option<RecentEps>,
     pub queued_episodes: Option<QueuedEpisodesResponse>,
-    pub saved_episodes: Option<Vec<Episode>>,
+    #[serde(default)]
+    pub saved_episodes: Vec<Episode>,
     pub episode_history: Option<HistoryDataResponse>,
     pub downloaded_episodes: Option<EpisodeDownloadResponse>,
     pub search_episodes: Option<SearchResponse>,
@@ -140,7 +141,6 @@ pub struct AppState {
     pub date_format: Option<String>,
     pub podcast_added: Option<bool>,
     pub completed_episodes: Option<Vec<i32>>,
-    pub saved_episode_ids: Option<Vec<i32>>,
     pub queued_episode_ids: Option<Vec<i32>>,
     pub downloaded_episode_ids: Option<Vec<i32>>,
     pub locally_downloaded_episodes: Option<Vec<i32>>,
@@ -156,6 +156,12 @@ pub struct AppState {
     pub current_playlist_info: Option<PlaylistInfo>,
     pub current_playlist_episodes: Option<Vec<Episode>>,
     pub active_tasks: Option<Vec<TaskProgress>>,
+}
+
+impl AppState {
+    pub fn saved_episode_ids(&self) -> Vec<i32> {
+        self.saved_episodes.iter().map(|e| e.episodeid).collect()
+    }
 }
 
 #[derive(Default, Deserialize, Clone, PartialEq, Store, Debug)]
