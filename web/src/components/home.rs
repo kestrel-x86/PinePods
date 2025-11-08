@@ -491,7 +491,7 @@ pub fn home_episode_item(props: &HomeEpisodeItemProps) -> Html {
             history.clone(),
             dispatch.clone(),
             props.episode.episodeid.clone(),
-            props.episode.episodeurl.clone(), // TODO: fix these
+            props.episode.episodeurl.clone(),
             src,
             props.episode.episodetitle.clone(),
             true,

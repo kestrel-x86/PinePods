@@ -6,8 +6,7 @@ use crate::components::click_events::create_on_title_click;
 use crate::components::context::{AppState, UIState};
 use crate::components::gen_funcs::format_error_message;
 use crate::components::gen_funcs::{
-    convert_time_to_seconds, format_datetime, format_time, match_date_format, parse_date,
-    sanitize_html_with_blank_target,
+    format_datetime, format_time, match_date_format, parse_date, sanitize_html_with_blank_target,
 };
 use crate::components::host_component::HostDropdown;
 use crate::components::safehtml::SafeHtml;
@@ -17,9 +16,8 @@ use crate::requests::pod_req::{
     call_fetch_podcasting_2_data, call_get_episode_id, call_mark_episode_completed,
     call_mark_episode_uncompleted, call_queue_episode, call_remove_downloaded_episode,
     call_remove_queued_episode, call_remove_saved_episode, call_save_episode,
-    DownloadEpisodeRequest, EpisodeInfo, EpisodeMetadataResponse, EpisodeRequest,
-    FetchPodcasting2DataRequest, MarkEpisodeCompletedRequest, QueuePodcastRequest,
-    SavePodcastRequest, Transcript,
+    DownloadEpisodeRequest, EpisodeRequest, FetchPodcasting2DataRequest,
+    MarkEpisodeCompletedRequest, QueuePodcastRequest, SavePodcastRequest, Transcript,
 };
 use crate::requests::search_pods::{call_get_podcast_details_dynamic, call_parse_podcast_url};
 use i18nrs::yew::use_translation;

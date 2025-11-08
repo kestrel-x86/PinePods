@@ -83,9 +83,9 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
         });
     }
 
-    let desc_expanded = desc_state
-        .expanded_descriptions
-        .contains(&props.episode.episodeid.to_string());
+    // let desc_expanded = desc_state
+    //     .expanded_descriptions
+    //     .contains(&props.episode.episodeid.to_string());
 
     // #[wasm_bindgen]
     // extern "C" {
@@ -513,7 +513,7 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
             }
 
             if *show_modal {
-                <EpisodeModal // todo: clean up args
+                <EpisodeModal
                     episode_id={props.episode.get_episode_id(None)}
                     episode_url={props.episode.episodeurl.clone()}
                     episode_artwork={props.episode.get_episode_artwork()}

@@ -9,7 +9,6 @@ use gloo::net::websocket::{futures::WebSocket, Message};
 use gloo_net::http::Request;
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
-use std::any::Any;
 use std::collections::HashMap;
 use std::fmt;
 use wasm_bindgen::JsCast;
@@ -747,29 +746,6 @@ pub struct QueuedEpisodesResponse {
     pub episodes: Vec<Episode>,
 }
 
-#[derive(Debug, Deserialize, Clone, PartialEq)]
-#[allow(non_snake_case)]
-#[serde(rename_all = "lowercase")]
-pub struct QueuedEpisode {
-    pub episodetitle: String,
-    pub podcastname: String,
-    pub episodepubdate: String,
-    pub episodedescription: String,
-    pub episodeartwork: String,
-    pub episodeurl: String,
-    #[serde(default)]
-    pub queueposition: Option<i32>,
-    pub episodeduration: i32,
-    pub queuedate: String,
-    pub listenduration: Option<i32>,
-    pub episodeid: i32,
-    pub completed: bool,
-    pub saved: bool,      // Added field
-    pub queued: bool,     // Added field
-    pub downloaded: bool, // Added field
-    pub is_youtube: bool,
-}
-
 #[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct DataResponse {
     pub data: Vec<Episode>,
@@ -1273,30 +1249,6 @@ pub async fn call_remove_downloaded_episode(
 }
 
 // Get Single Epsiode
-
-#[derive(Debug, Deserialize, Default, Serialize, Clone, PartialEq)]
-#[allow(non_snake_case)]
-#[serde(default)]
-pub struct EpisodeInfo {
-    pub episodetitle: String,
-    pub podcastname: String,
-    pub podcastid: i32,
-    pub podcastindexid: i32,
-    pub feedurl: String,
-    pub episodepubdate: String,
-    pub episodedescription: String,
-    pub episodeartwork: String,
-    pub episodeurl: String,
-    pub episodeduration: i32,
-    pub listenduration: i32,
-    pub episodeid: i32,
-    pub completed: bool,
-    pub is_queued: bool,
-    pub is_saved: bool,
-    pub is_downloaded: bool,
-    pub is_youtube: bool,
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EpisodeRequest {
     pub episode_id: i32,
@@ -1305,11 +1257,6 @@ pub struct EpisodeRequest {
     pub person_episode: bool,
     #[serde(default)]
     pub is_youtube: bool,
-}
-
-#[derive(Debug, Deserialize, Clone, PartialEq)]
-pub struct EpisodeMetadataResponse {
-    pub episode: EpisodeInfo,
 }
 
 #[allow(dead_code)]

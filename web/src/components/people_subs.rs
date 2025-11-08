@@ -1,22 +1,16 @@
 use super::app_drawer::App_drawer;
-use super::gen_components::{empty_message, on_shownotes_click, Search_nav, UseScrollToTop};
-use super::virtual_list::PersonEpisodeVirtualList;
-use crate::components::audio::on_play_pause;
+use super::gen_components::{empty_message, Search_nav, UseScrollToTop};
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
-use crate::components::gen_funcs::sanitize_html_with_blank_target;
+use crate::components::virtual_list::VirtualList;
 use crate::requests::episode::Episode;
 use crate::requests::people_req::{self, PersonSubscription};
 use i18nrs::yew::use_translation;
+use std::rc::Rc;
 use yew::prelude::*;
 use yew::{function_component, html, Html};
 use yew_router::history::BrowserHistory;
 use yewdux::prelude::*;
-// use crate::components::gen_funcs::check_auth;
-use crate::components::gen_funcs::format_datetime;
-use crate::components::gen_funcs::match_date_format;
-use crate::components::gen_funcs::parse_date;
-use std::rc::Rc;
 
 use wasm_bindgen::prelude::*;
 
@@ -372,17 +366,9 @@ fn render_host_with_episodes(
                 web_sys::console::log_1(&format!("Attempting to render {} episodes", episode_count).into());
                 html! {
                     <div class="episodes-dropdown pl-4">
-                        <PersonEpisodeVirtualList
-                            episodes={episodes.clone()}
-                            item_height={234.0}
-                            search_state={state.clone()}
-                            search_ui_state={audio_state.clone()}
-                            dispatch={audio_dispatch.clone()}
-                            search_dispatch={dispatch.clone()}
-                            history={history_clone.clone()}
-                            server_name={server_name.clone()}
-                            user_id={user_id.clone()}
-                            api_key={api_key.clone()}
+                        <VirtualList
+                            episodes={ episodes }
+                            page_type="people"
                         />
                     </div>
                 }

@@ -13,7 +13,7 @@ use crate::requests::pod_req::{
     call_download_episode, call_mark_episode_completed, call_mark_episode_uncompleted,
     call_queue_episode, call_remove_downloaded_episode, call_remove_queued_episode,
     call_remove_saved_episode, call_save_episode, DownloadEpisodeRequest,
-    MarkEpisodeCompletedRequest, QueuePodcastRequest, QueuedEpisode, SavePodcastRequest,
+    MarkEpisodeCompletedRequest, QueuePodcastRequest, SavePodcastRequest,
 };
 #[cfg(not(feature = "server_build"))]
 use crate::requests::pod_req::{

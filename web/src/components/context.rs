@@ -10,10 +10,9 @@ use crate::requests::login_requests::{GetApiDetails, TimeZoneInfo};
 use crate::requests::pod_req::PodcastResponseExtra;
 
 use crate::requests::pod_req::{
-    Chapter, EpisodeDownloadResponse, EpisodeMetadataResponse, Funding, HistoryDataResponse,
-    HomeOverview, Person, Playlist, PlaylistInfo, Podcast, PodcastResponse, PodrollItem,
-    QueuedEpisodesResponse, RecentEps, RefreshProgress, SavedEpisodesResponse,
-    SharedEpisodeResponse, Transcript, Value,
+    Chapter, EpisodeDownloadResponse, Funding, HistoryDataResponse, HomeOverview, Person, Playlist,
+    PlaylistInfo, Podcast, PodcastResponse, PodrollItem, QueuedEpisodesResponse, RecentEps,
+    RefreshProgress, SavedEpisodesResponse, SharedEpisodeResponse, Transcript, Value,
 };
 use crate::requests::search_pods::{
     PeopleFeedResult, PodcastFeedResult, PodcastSearchResult, SearchResponse, YouTubeChannel,

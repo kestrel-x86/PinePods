@@ -8,7 +8,6 @@ use crate::components::gen_funcs::{
 };
 use crate::components::host_component::HostDropdown;
 use crate::components::podcast_layout::ClickedFeedURL;
-use crate::components::virtual_list::PodcastEpisodeVirtualList;
 use crate::components::virtual_list::VirtualList;
 use crate::requests::pod_req::{
     call_add_category, call_add_podcast, call_adjust_skip_times, call_bulk_download_episodes,
