@@ -1,10 +1,10 @@
 use crate::components::audio::on_play_pause;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
-use crate::components::gen_components::on_shownotes_click;
-use crate::components::gen_components::{ContextButton, EpisodeModal, FallbackImage};
-use crate::components::gen_funcs::use_long_press;
+use crate::components::gen_components::{
+    on_shownotes_click, ContextButton, EpisodeModal, FallbackImage, PageType,
+};
 use crate::components::gen_funcs::{
-    format_datetime, match_date_format, parse_date, sanitize_html_with_blank_target,
+    format_datetime, match_date_format, parse_date, sanitize_html_with_blank_target, use_long_press,
 };
 use crate::components::gen_funcs::{format_time, strip_images_from_html};
 use crate::components::safehtml::SafeHtml;
@@ -24,7 +24,8 @@ pub struct EpisodeListItemProps {
     pub episode: Episode,
     // pub _is_expanded: bool,
     // pub toggle_expanded: Callback<MouseEvent>,
-    pub page_type: String,
+    #[prop_or(PageType::Default)]
+    pub page_type: PageType,
     #[prop_or_default]
     pub on_checkbox_change: Callback<i32>,
     #[prop_or_default]

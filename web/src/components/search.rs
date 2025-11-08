@@ -3,11 +3,11 @@ use super::gen_components::{empty_message, on_shownotes_click, Search_nav, UseSc
 use crate::components::audio::on_play_pause;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState};
+use crate::components::episode_list_item::EpisodeListItem;
 use crate::components::episodes_layout::AppStateMsg;
 use crate::components::gen_funcs::{
     format_datetime, match_date_format, parse_date, sanitize_html_with_blank_target,
 };
-use crate::components::episode_list_item::EpisodeListItem;
 use crate::requests::search_pods::{call_search_database, SearchRequest, SearchResponse};
 use async_std::task::sleep;
 use gloo_events::EventListener;
@@ -249,7 +249,6 @@ pub fn search(_props: &SearchProps) -> Html {
                                     html! {
                                         <EpisodeListItem
                                             episode={ episode.clone() }
-                                            page_type={ "search" }
                                         />
                                     }
                                 }).collect::<Html>() }

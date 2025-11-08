@@ -1,4 +1,5 @@
 use crate::components::episode_list_item::EpisodeListItem;
+use crate::components::gen_components::PageType;
 use crate::requests::episode::Episode;
 use gloo::events::EventListener;
 use i18nrs::yew::use_translation;
@@ -56,7 +57,8 @@ impl DragCallbacks {
 #[derive(Properties, PartialEq)]
 pub struct VirtualListProps {
     pub episodes: Vec<Episode>,
-    pub page_type: String,
+    #[prop_or(PageType::Default)]
+    pub page_type: PageType,
     #[prop_or_default]
     pub drag_callbacks: DragCallbacks,
 }

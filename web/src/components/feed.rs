@@ -180,7 +180,6 @@ pub fn feed() -> Html {
                                 html! {
                                     <VirtualList
                                         episodes={episodes}
-                                        page_type="home"
                                     />
                                 }
                             }

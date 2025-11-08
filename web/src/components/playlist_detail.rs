@@ -1,10 +1,10 @@
 use crate::components::app_drawer::App_drawer;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState};
-use i18nrs::yew::use_translation;
-use crate::components::virtual_list::VirtualList;
 use crate::components::gen_components::{Search_nav, UseScrollToTop};
+use crate::components::virtual_list::VirtualList;
 use crate::requests::pod_req;
+use i18nrs::yew::use_translation;
 use yew::prelude::*;
 use yewdux::prelude::*;
 
@@ -16,7 +16,7 @@ pub struct Props {
 #[function_component(PlaylistDetail)]
 pub fn playlist_detail(props: &Props) -> Html {
     let (i18n, _) = use_translation();
-    
+
     let (state, dispatch) = use_store::<AppState>();
     let (audio_state, _audio_dispatch) = use_store::<UIState>();
     let loading = use_state(|| true);
@@ -201,7 +201,6 @@ pub fn playlist_detail(props: &Props) -> Html {
                                 } else {
                                     <VirtualList
                                         episodes={episodes.clone()}
-                                        page_type="playlist"
                                     />
                                 }
                             }

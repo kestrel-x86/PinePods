@@ -356,7 +356,6 @@ pub fn history() -> Html {
                                         html! {
                                             <VirtualList
                                                 episodes={(*filtered_episodes).clone()}
-                                                page_type="history"
                                             />
                                         }
                                     }

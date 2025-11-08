@@ -1,15 +1,14 @@
 use super::app_drawer::App_drawer;
-use super::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
+use super::gen_components::{empty_message, FallbackImage, PageType, Search_nav, UseScrollToTop};
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
 
 use crate::components::episode_list_item::EpisodeListItem;
+use crate::requests::episode::Episode;
 use crate::requests::pod_req::{
     call_bulk_delete_downloaded_episodes, call_get_episode_downloads, call_get_podcasts,
     BulkEpisodeActionRequest, EpisodeDownloadResponse, Podcast, PodcastResponse,
 };
-use crate::requests::episode::Episode;
-
 
 use i18nrs::yew::use_translation;
 use std::borrow::Borrow;
@@ -648,7 +647,7 @@ pub fn render_podcast_with_episodes(
                                     html!{
                                         <EpisodeListItem
                                             episode={ episode }
-                                            page_type={ "downloads" }
+                                            page_type={ PageType::Downloads }
                                             on_checkbox_change={ on_checkbox_change_cloned }
                                             is_delete_mode={ is_delete_mode }
                                         />

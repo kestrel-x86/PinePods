@@ -368,7 +368,6 @@ fn render_host_with_episodes(
                     <div class="episodes-dropdown pl-4">
                         <VirtualList
                             episodes={ episodes }
-                            page_type="people"
                         />
                     </div>
                 }

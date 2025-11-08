@@ -1,5 +1,5 @@
 use super::app_drawer::App_drawer;
-use super::gen_components::{empty_message, on_shownotes_click, Search_nav, UseScrollToTop};
+use super::gen_components::{empty_message, on_shownotes_click, Search_nav, UseScrollToTop, PageType};
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState};
 use crate::components::episode_list_item::EpisodeListItem;
@@ -469,7 +469,7 @@ pub fn virtual_queue_list(props: &VirtualQueueListProps) -> Html {
     html! {
         <crate::components::virtual_list::VirtualList
             episodes={ props.episodes.clone() }
-            page_type={ "queue" }
+            page_type={ PageType::Queue }
             drag_callbacks={ DragCallbacks{ ondragstart: Some(ondragstart), ondragenter: Some(ondragenter), ondragover: Some(ondragover), ondrop: Some(ondrop) } }
             />
     }

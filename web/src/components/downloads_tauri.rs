@@ -1,5 +1,5 @@
 use super::app_drawer::App_drawer;
-use super::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
+use super::gen_components::{empty_message, FallbackImage, PageType, Search_nav, UseScrollToTop};
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
 
@@ -1007,7 +1007,7 @@ pub fn render_podcast_with_episodes(
                                     html!{
                                         <EpisodeListItem
                                             episode={ episode }
-                                            page_type={ "local_downloads" }
+                                            page_type={ PageType::LocalDownloads }
                                             on_checkbox_change={ on_checkbox_change_cloned }
                                             is_delete_mode={ is_delete_mode }
                                         />

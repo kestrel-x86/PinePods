@@ -1,6 +1,6 @@
 use super::app_drawer::App_drawer;
 use super::gen_components::{
-    empty_message, on_shownotes_click, use_long_press, Search_nav, UseScrollToTop,
+    empty_message, on_shownotes_click, use_long_press, PageType, Search_nav, UseScrollToTop,
 };
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
@@ -364,7 +364,7 @@ pub fn saved() -> Html {
                                         html! {
                                             <VirtualList
                                                 episodes={(*filtered_episodes).clone()}
-                                                page_type="saved"
+                                                page_type= { PageType::Saved }
                                             />
                                         }
                                     }

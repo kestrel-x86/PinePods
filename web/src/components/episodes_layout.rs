@@ -4051,7 +4051,6 @@ pub fn episode_layout() -> Html {
                                         html! {
                                             <VirtualList
                                                 episodes={ (*filtered_episodes).clone() }
-                                                page_type={ "episodes" }
                                             />
                                         }
                                     } else {

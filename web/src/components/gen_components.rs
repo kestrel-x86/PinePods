@@ -688,10 +688,20 @@ pub fn first_admin_modal(props: &FirstAdminModalProps) -> Html {
     }
 }
 
+/// Specific page types for unique ctx menu implementations
+#[derive(Clone, PartialEq)]
+pub enum PageType {
+    Saved,
+    Queue,
+    Downloads,
+    LocalDownloads,
+    Default,
+}
+
 #[derive(Properties, Clone, PartialEq)]
 pub struct ContextButtonProps {
     pub episode: Episode,
-    pub page_type: String,
+    pub page_type: PageType,
     #[prop_or(false)]
     pub show_menu_only: bool,
     #[prop_or(None)]
@@ -1594,9 +1604,8 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
 
     #[cfg(feature = "server_build")]
     let local_download_options = html! {};
-
-    let action_buttons = match props.page_type.as_str() {
-        "saved" => html! {
+    let action_buttons = match props.page_type {
+        PageType::Saved => html! {
             <>
                 <li class="dropdown-option" onclick={wrap_action(on_toggle_queue.clone())}>
                     { if is_queued { "Remove from Queue" } else { "Queue Episode" } }
@@ -1612,7 +1621,7 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
                 </li>
             </>
         },
-        "queue" => html! {
+        PageType::Queue => html! {
             <>
                 <li class="dropdown-option" onclick={wrap_action(on_toggle_save.clone())}>
                     { if is_saved { "Remove from Saved Episodes" } else { "Save Episode" } }
@@ -1626,7 +1635,7 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
                 <li class="dropdown-option" onclick={wrap_action(on_toggle_complete.clone())}>{ if is_completed { "Mark Episode Incomplete" } else { "Mark Episode Complete" } }</li>
             </>
         },
-        "downloads" => html! {
+        PageType::Downloads => html! {
             <>
                 <li class="dropdown-option" onclick={wrap_action(on_toggle_queue.clone())}>
                     { if is_queued { "Remove from Queue" } else { "Queue Episode" } }
@@ -1640,12 +1649,10 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
                 <li class="dropdown-option" onclick={wrap_action(on_toggle_complete.clone())}>{ if is_completed { "Mark Episode Incomplete" } else { "Mark Episode Complete" } }</li>
             </>
         },
-        "local_downloads" => html! {
+        PageType::LocalDownloads => html! {
             local_download_options
         },
-        // Add more page types and their respective button sets as needed
-        _ => html! {
-            // Default set of buttons for other page types
+        PageType::Default => html! {
             <>
                 <li class="dropdown-option" onclick={wrap_action(on_toggle_queue.clone())}>
                     { if is_queued { "Remove from Queue" } else { "Queue Episode" } }
