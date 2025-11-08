@@ -194,7 +194,7 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
         .unwrap_or(&vec![])
         .contains(&props.episode.episodeid);
 
-    let checkbox_ep = props.episode.get_episode_id(Some(0));
+    let checkbox_ep = props.episode.episodeid;
 
     // Handle context menu position
     // let context_menu_style = if props.show_context_menu {
@@ -363,7 +363,7 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
                         <div class="flex items-center pl-4">
                             <input
                                 type="checkbox"
-                                checked={state.selected_episodes_for_deletion.contains(&props.episode.get_episode_id(Some(0)))}
+                                checked={state.selected_episodes_for_deletion.contains(&props.episode.episodeid)}
                                 class="podcast-dropdown-checkbox h-5 w-5 rounded border-2 text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer appearance-none checked:bg-primary checked:border-primary"
                                 onchange={props.on_checkbox_change.reform(move |_| checkbox_ep)}
                             />
@@ -377,14 +377,14 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
                 <div class="flex flex-col w-auto object-cover pl-4">
                     <FallbackImage
                         src={props.episode.episodeartwork.clone()}
-                        alt={format!("Cover for {}", props.episode.get_episode_title())}
+                        alt={format!("Cover for {}", props.episode.episodetitle)}
                         class="episode-image"
                     />
                 </div>
                 <div class="flex flex-col p-4 space-y-2 flex-grow md:w-7/12 self-start">
                     <div class="flex items-center space-x-2 cursor-pointer" onclick={on_shownotes_click.clone()}>
                     <p class="item_container-text episode-title font-semibold line-clamp-2">
-                        {props.episode.get_episode_title()}
+                        {props.episode.episodetitle.clone()}
                     </p>
                     {
                         if is_completed.clone() {
@@ -400,7 +400,7 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
                     {
                         html! {
                             <div class="item-description-text cursor-pointer hidden md:block"
-                                onclick={let episode_id = props.episode.get_episode_id(None);
+                                onclick={let episode_id = props.episode.episodeid;
                                         let omo = on_modal_open.clone();
                                         Callback::from(move |e: MouseEvent| {
                                             e.prevent_default();
@@ -515,17 +515,17 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
 
             if *show_modal {
                 <EpisodeModal
-                    episode_id={props.episode.get_episode_id(None)}
+                    episode_id={props.episode.episodeid}
                     episode_url={props.episode.episodeurl.clone()}
-                    episode_artwork={props.episode.get_episode_artwork()}
-                    episode_title={props.episode.get_episode_title()}
+                    episode_artwork={props.episode.episodeartwork.clone()}
+                    episode_title={props.episode.episodetitle.clone()}
                     description={episode_description.clone()}
                     format_release={formatted_pub_date.to_string()}
                     duration={props.episode.episodeduration}
                     on_close={on_modal_close.clone()}
                     on_show_notes={on_shownotes_click.clone()}
                     listen_duration_percentage={listen_duration_percentage}
-                    is_youtube={props.episode.get_is_youtube()}
+                    is_youtube={props.episode.is_youtube}
                 />
             }
         </div>

@@ -56,22 +56,6 @@ pub struct Episode {
 }
 
 impl Episode {
-    pub fn get_episode_artwork(&self) -> String {
-        self.episodeartwork.clone()
-    }
-
-    pub fn get_episode_title(&self) -> String {
-        self.episodetitle.clone()
-    }
-
-    pub fn get_is_youtube(&self) -> bool {
-        self.is_youtube
-    }
-
-    pub fn get_episode_id(&self, _fallback_id: Option<i32>) -> i32 {
-        self.episodeid.clone()
-    }
-
     pub fn as_any(&self) -> &dyn Any {
         self
     }

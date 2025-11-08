@@ -821,7 +821,7 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
         });
     }
 
-    let check_episode_id = props.episode.get_episode_id(Some(0));
+    let check_episode_id = props.episode.episodeid;
 
     let queue_api_key = api_key.clone();
     let queue_server_name = server_name.clone();
@@ -835,9 +835,9 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
             let queue_post = queue_post.clone();
             let episode_clone = episode.clone();
             let request = QueuePodcastRequest {
-                episode_id: episode.get_episode_id(Some(0)),
+                episode_id: episode.episodeid,
                 user_id: user_id.unwrap(), // replace with the actual user ID
-                is_youtube: episode.get_is_youtube(),
+                is_youtube: episode.is_youtube,
             };
             let server_name = server_name_copy; // replace with the actual server name
             let api_key = api_key_copy; // replace with the actual API key
@@ -850,7 +850,7 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
                         queue_post.reduce_mut(|state| {
                             state.info_message = Option::from(format!("{}", success_message));
                             if let Some(ref mut queued_episodes) = state.queued_episode_ids {
-                                queued_episodes.push(episode_clone.get_episode_id(Some(0)));
+                                queued_episodes.push(episode_clone.episodeid);
                             }
                         });
                     }
@@ -874,15 +874,15 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
     // let server_name = server_name.clone();
     let on_remove_queued_episode = {
         let episode = props.episode.clone();
-        let episode_id = props.episode.get_episode_id(Some(0));
+        let episode_id = props.episode.episodeid;
         Callback::from(move |_| {
             let post_dispatch = dispatch_clone.clone();
             let server_name_copy = remove_queue_server_name.clone();
             let api_key_copy = remove_queue_api_key.clone();
             let request = QueuePodcastRequest {
-                episode_id: episode.get_episode_id(Some(0)),
+                episode_id: episode.episodeid,
                 user_id: user_id.unwrap(), // replace with the actual user ID
-                is_youtube: episode.get_is_youtube(),
+                is_youtube: episode.is_youtube,
             };
             let server_name = server_name_copy; // replace with the actual server name
             let api_key = api_key_copy; // replace with the actual API key
@@ -903,7 +903,7 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
                             if let Some(ref mut queued_episodes) = state.queued_episodes {
                                 queued_episodes
                                     .episodes
-                                    .retain(|ep| ep.get_episode_id(Some(0)) != episode_id);
+                                    .retain(|ep| ep.episodeid != episode_id);
                             }
                             if let Some(ref mut queued_episode_ids) = state.queued_episode_ids {
                                 queued_episode_ids.retain(|&id| id != episode_id);
@@ -955,9 +955,9 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
             let post_state = save_post.clone();
             let episode_clone = episode.clone();
             let request = SavePodcastRequest {
-                episode_id: episode.get_episode_id(Some(0)), // changed from episode_title
+                episode_id: episode.episodeid, // changed from episode_title
                 user_id: user_id.unwrap(),
-                is_youtube: episode.get_is_youtube(),
+                is_youtube: episode.is_youtube,
             };
             let server_name = server_name_copy; // replace with the actual server name
             let api_key = api_key_copy; // replace with the actual API key
@@ -993,15 +993,15 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
     let dispatch_clone = post_dispatch.clone();
     let on_remove_saved_episode = {
         let episode = props.episode.clone();
-        let episode_id = props.episode.get_episode_id(Some(0));
+        let episode_id = props.episode.episodeid;
         Callback::from(move |_| {
             let post_dispatch = dispatch_clone.clone();
             let server_name_copy = remove_saved_server_name.clone();
             let api_key_copy = remove_saved_api_key.clone();
             let request = SavePodcastRequest {
-                episode_id: episode.get_episode_id(Some(0)),
+                episode_id: episode.episodeid,
                 user_id: user_id.unwrap(),
-                is_youtube: episode.get_is_youtube(),
+                is_youtube: episode.is_youtube,
             };
             let server_name = server_name_copy; // replace with the actual server name
             let api_key = api_key_copy; // replace with the actual API key
@@ -1062,9 +1062,9 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
             let api_key_copy = download_api_key.clone();
             let episode_clone = episode.clone();
             let request = DownloadEpisodeRequest {
-                episode_id: episode.get_episode_id(Some(0)),
+                episode_id: episode.episodeid,
                 user_id: user_id.unwrap(), // replace with the actual user ID
-                is_youtube: episode.get_is_youtube(),
+                is_youtube: episode.is_youtube,
             };
             let server_name = server_name_copy; // replace with the actual server name
             let api_key = api_key_copy; // replace with the actual API key
@@ -1079,7 +1079,7 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
                             state.info_message = Option::from(format!("{}", success_message));
                             if let Some(ref mut downloaded_episodes) = state.downloaded_episode_ids
                             {
-                                downloaded_episodes.push(episode_clone.get_episode_id(Some(0)));
+                                downloaded_episodes.push(episode_clone.episodeid);
                             }
                         });
                     }
@@ -1102,15 +1102,15 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
     let dispatch_clone = post_dispatch.clone();
     let on_remove_downloaded_episode = {
         let episode = props.episode.clone();
-        let episode_id = props.episode.get_episode_id(Some(0));
+        let episode_id = props.episode.episodeid;
         Callback::from(move |_| {
             let post_dispatch = dispatch_clone.clone();
             let server_name_copy = remove_download_server_name.clone();
             let api_key_copy = remove_download_api_key.clone();
             let request = DownloadEpisodeRequest {
-                episode_id: episode.get_episode_id(Some(0)),
+                episode_id: episode.episodeid,
                 user_id: user_id.unwrap(), // replace with the actual user ID
-                is_youtube: episode.get_is_youtube(),
+                is_youtube: episode.is_youtube,
             };
             let server_name = server_name_copy; // replace with the actual server name
             let api_key = api_key_copy; // replace with the actual API key
@@ -1133,7 +1133,7 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
                             if let Some(ref mut downloaded_episodes) = state.downloaded_episodes {
                                 downloaded_episodes
                                     .episodes
-                                    .retain(|ep| ep.get_episode_id(Some(0)) != episode_id);
+                                    .retain(|ep| ep.episodeid != episode_id);
                             }
                             if let Some(ref mut downloaded_episode_ids) =
                                 state.downloaded_episode_ids
@@ -1174,11 +1174,6 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
     let on_toggle_download = {
         let on_download = on_download_episode.clone();
         let on_remove_download = on_remove_downloaded_episode.clone();
-        // let is_queued = post_state
-        //     .queued_episode_ids
-        //     .as_ref()
-        //     .unwrap_or(&vec![])
-        //     .contains(&props.episode.get_episode_id(Some(0)));
         Callback::from(move |_| {
             if is_downloaded {
                 on_remove_download.emit(());
@@ -1198,12 +1193,12 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
 
         Callback::from(move |_| {
             let post_state = download_local_post.clone();
-            let episode_id = episode.get_episode_id(Some(0));
+            let episode_id = episode.episodeid;
             let request = EpisodeRequest {
                 episode_id,
                 user_id: user_id_copy.unwrap(),
                 person_episode: false,
-                is_youtube: episode.get_is_youtube(),
+                is_youtube: episode.is_youtube,
             };
             let server_name = server_name_copy.clone().unwrap();
             let ep_api_key = api_key_copy.clone().flatten();
@@ -1328,7 +1323,7 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
         Callback::from(move |_: MouseEvent| {
             let post_state = download_local_post.clone();
             let ui_state = download_ui_dispatch.clone();
-            let episode_id = episode.get_episode_id(Some(0));
+            let episode_id = episode.episodeid;
 
             let future = async move {
                 let filename = format!("episode_{}.mp3", episode_id);
@@ -1378,15 +1373,15 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
     let uncomplete_dispatch_clone = post_dispatch.clone();
     let on_uncomplete_episode = {
         let episode = props.episode.clone();
-        let episode_id = props.episode.get_episode_id(Some(0));
+        let episode_id = props.episode.episodeid;
         Callback::from(move |_| {
             let post_dispatch = uncomplete_dispatch_clone.clone();
             let server_name_copy = uncomplete_server_name.clone();
             let api_key_copy = uncomplete_api_key.clone();
             let request = MarkEpisodeCompletedRequest {
-                episode_id: episode.get_episode_id(Some(0)),
+                episode_id: episode.episodeid,
                 user_id: user_id.unwrap(), // replace with the actual user ID
-                is_youtube: episode.get_is_youtube(),
+                is_youtube: episode.is_youtube,
             };
             let server_name = server_name_copy; // replace with the actual server name
             let api_key = api_key_copy; // replace with the actual API key
@@ -1435,15 +1430,15 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
     let dispatch_clone = post_dispatch.clone();
     let on_complete_episode = {
         let episode = props.episode.clone();
-        let episode_id = props.episode.get_episode_id(Some(0));
+        let episode_id = props.episode.episodeid;
         Callback::from(move |_| {
             let post_dispatch = dispatch_clone.clone();
             let server_name_copy = complete_server_name.clone();
             let api_key_copy = complete_api_key.clone();
             let request = MarkEpisodeCompletedRequest {
-                episode_id: episode.get_episode_id(Some(0)),
+                episode_id: episode.episodeid,
                 user_id: user_id.unwrap(), // replace with the actual user ID
-                is_youtube: episode.get_is_youtube(),
+                is_youtube: episode.is_youtube,
             };
             let server_name = server_name_copy; // replace with the actual server name
             let api_key = api_key_copy; // replace with the actual API key
