@@ -875,7 +875,7 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
     let on_remove_queued_episode = {
         let episode = props.episode.clone();
         let episode_id = props.episode.episodeid;
-        Callback::from(move |_| {
+        Callback::from(move |_: MouseEvent| {
             let post_dispatch = dispatch_clone.clone();
             let server_name_copy = remove_queue_server_name.clone();
             let api_key_copy = remove_queue_api_key.clone();
@@ -935,9 +935,9 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
     let on_toggle_queue = {
         let on_add_to_queue = on_add_to_queue.clone();
         let on_remove_queued_episode = on_remove_queued_episode.clone();
-        Callback::from(move |_| {
+        Callback::from(move |e: MouseEvent| {
             if is_queued {
-                on_remove_queued_episode.emit(());
+                on_remove_queued_episode.emit(e);
             } else {
                 on_add_to_queue.emit(());
             }
@@ -961,6 +961,7 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
             };
             let server_name = server_name_copy; // replace with the actual server name
             let api_key = api_key_copy; // replace with the actual API key
+            let ep = episode.clone();
             let future = async move {
                 // let return_mes = call_save_episode(&server_name.unwrap(), &api_key.flatten(), &request).await;
                 // post_state.reduce_mut(|state| state.info_message = Option::from(format!("Episode saved successfully")));
@@ -1614,8 +1615,8 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
                 <li class="dropdown-option" onclick={wrap_action(on_toggle_save.clone())}>
                     { if is_saved { "Remove from Saved Episodes" } else { "Save Episode" } }
                 </li>
-                <li class="dropdown-option" onclick={wrap_action(on_toggle_queue.clone())}>
-                    { if is_queued { "Remove from Queue" } else { "Queue Episode" } }
+                <li class="dropdown-option" onclick={wrap_action(on_remove_queued_episode.clone())}>
+                    { "Remove from Queue" }
                 </li>
                 {
                     download_button.clone()
