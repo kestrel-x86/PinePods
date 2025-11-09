@@ -1,7 +1,8 @@
-use super::app_drawer::App_drawer;
-use super::gen_components::{empty_message, FallbackImage, PageType, Search_nav, UseScrollToTop};
+use crate::components::app_drawer::App_drawer;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
+use crate::components::context_menu_button::PageType;
+use crate::components::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
 
 use crate::components::episode_list_item::EpisodeListItem;
 use crate::requests::episode::Episode;
@@ -191,11 +192,7 @@ pub async fn remove_multiple_episodes_from_local_db(episode_ids: Vec<i32>) -> Re
     for id in episode_ids {
         episode_ids_array.push(&JsValue::from_f64(id as f64));
     }
-    js_sys::Reflect::set(
-        &args,
-        &JsValue::from_str("episodeIds"),
-        &episode_ids_array,
-    )?;
+    js_sys::Reflect::set(&args, &JsValue::from_str("episodeIds"), &episode_ids_array)?;
 
     // Make the call
     let command = JsValue::from_str("remove_multiple_from_local_db");
@@ -320,23 +317,36 @@ pub fn downloads() -> Html {
     let (ui_state, ui_dispatch) = use_store::<UIState>();
     let (desc_state, desc_dispatch) = use_store::<ExpandedDescriptions>();
     let effect_dispatch = dispatch.clone();
-    
+
     // Capture i18n strings before they get moved
-    let i18n_locally_downloaded_episodes = i18n.t("downloads_tauri.locally_downloaded_episodes").to_string();
+    let i18n_locally_downloaded_episodes = i18n
+        .t("downloads_tauri.locally_downloaded_episodes")
+        .to_string();
     let i18n_select_multiple = i18n.t("downloads_tauri.select_multiple").to_string();
     let i18n_cancel = i18n.t("common.cancel").to_string();
     let i18n_delete = i18n.t("common.delete").to_string();
     let i18n_clear_all = i18n.t("downloads.clear_all").to_string();
     let i18n_completed = i18n.t("downloads.completed").to_string();
-    let i18n_downloaded_episodes_count = i18n.t("downloads_tauri.downloaded_episodes_count").to_string();
+    let i18n_downloaded_episodes_count = i18n
+        .t("downloads_tauri.downloaded_episodes_count")
+        .to_string();
     let i18n_in_progress = i18n.t("downloads.in_progress").to_string();
-    let i18n_search_downloaded_episodes = i18n.t("downloads.search_downloaded_episodes").to_string();
-    let i18n_no_downloaded_episodes_found = i18n.t("downloads.no_downloaded_episodes_found").to_string();
-    let i18n_no_downloaded_episodes_tauri_description = i18n.t("downloads_tauri.no_downloaded_episodes_description").to_string();
-    let i18n_no_episode_downloads_found = i18n.t("downloads.no_episode_downloads_found").to_string();
+    let i18n_search_downloaded_episodes =
+        i18n.t("downloads.search_downloaded_episodes").to_string();
+    let i18n_no_downloaded_episodes_found =
+        i18n.t("downloads.no_downloaded_episodes_found").to_string();
+    let i18n_no_downloaded_episodes_tauri_description = i18n
+        .t("downloads_tauri.no_downloaded_episodes_description")
+        .to_string();
+    let i18n_no_episode_downloads_found =
+        i18n.t("downloads.no_episode_downloads_found").to_string();
     let i18n_switch_to_online_mode = i18n.t("downloads_tauri.switch_to_online_mode").to_string();
-    let i18n_successfully_deleted_episodes = i18n.t("downloads_tauri.successfully_deleted_episodes").to_string();
-    let i18n_failed_to_delete_episodes = i18n.t("downloads_tauri.failed_to_delete_episodes").to_string();
+    let i18n_successfully_deleted_episodes = i18n
+        .t("downloads_tauri.successfully_deleted_episodes")
+        .to_string();
+    let i18n_failed_to_delete_episodes = i18n
+        .t("downloads_tauri.failed_to_delete_episodes")
+        .to_string();
     let history = BrowserHistory::new();
     let session_dispatch = effect_dispatch.clone();
     let session_state = state.clone();
@@ -481,11 +491,17 @@ pub fn downloads() -> Html {
                 // Use local Tauri delete function for bulk deletion
                 let dispatch_for_future = dispatch_cloned.clone();
                 wasm_bindgen_futures::spawn_local(async move {
-                    match remove_multiple_episodes_from_local_db(selected_episodes.iter().cloned().collect()).await {
+                    match remove_multiple_episodes_from_local_db(
+                        selected_episodes.iter().cloned().collect(),
+                    )
+                    .await
+                    {
                         Ok(_) => {
                             dispatch_for_future.reduce_mut(|state| {
                                 if let Some(downloaded_episodes) = &mut state.downloaded_episodes {
-                                    downloaded_episodes.episodes.retain(|ep| !selected_episodes.contains(&ep.episodeid));
+                                    downloaded_episodes
+                                        .episodes
+                                        .retain(|ep| !selected_episodes.contains(&ep.episodeid));
                                 }
                                 state.info_message = Some(format!(
                                     "{} {}",
@@ -495,7 +511,9 @@ pub fn downloads() -> Html {
                             });
                         }
                         Err(e) => {
-                            web_sys::console::log_1(&format!("Error deleting episodes: {:?}", e).into());
+                            web_sys::console::log_1(
+                                &format!("Error deleting episodes: {:?}", e).into(),
+                            );
                             dispatch_for_future.reduce_mut(|state| {
                                 state.error_message = Some(i18n_failed_to_delete_episodes.clone());
                             });
@@ -603,7 +621,13 @@ pub fn downloads() -> Html {
 
         if let Some(podcast_feed) = state.podcast_feed_return.as_ref() {
             if let Some(pods) = podcast_feed.pods.as_ref() {
-                web_sys::console::log_1(&format!("Podcast IDs in feed: {:?}", pods.iter().map(|p| p.podcastid).collect::<Vec<_>>()).into());
+                web_sys::console::log_1(
+                    &format!(
+                        "Podcast IDs in feed: {:?}",
+                        pods.iter().map(|p| p.podcastid).collect::<Vec<_>>()
+                    )
+                    .into(),
+                );
 
                 // Check matches
                 for podcast in pods.iter() {

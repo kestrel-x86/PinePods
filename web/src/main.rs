@@ -1,51 +1,48 @@
-// Custom Mods
 mod components;
+mod pages;
 mod requests;
 
 #[cfg(test)]
 mod tests;
 
-use components::routes::Route;
-// use components::login::Login;
-// use components::login::ChangeServer;
-// use components::login::LogOut;
-use components::downloads::Downloads;
-use components::episode::Episode;
-use components::episodes_layout::EpisodeLayout;
-use components::feed::Feed;
-use components::history::PodHistory;
-use components::home::Home;
-use components::navigation::NavigationHandler;
-use components::oauth_callback::OAuthCallback;
-use components::people_subs::SubscribedPeople;
-use components::person::Person;
-use components::playlist_detail::PlaylistDetail;
-use components::playlists::Playlists;
-use components::podcast_layout::PodLayout;
-use components::podcasts::Podcasts;
-use components::queue::Queue;
-use components::saved::Saved;
-use components::search::Search;
-use components::search_new::SearchNew;
-use components::settings::Settings;
-use components::shared_episode::SharedEpisode;
-use components::user_stats::UserStats;
-use components::youtube_layout::YouTubeLayout;
+use crate::components::navigation::NavigationHandler;
+use crate::components::oauth_callback::OAuthCallback;
+use crate::pages::downloads::Downloads;
+use crate::pages::episode::Episode;
+use crate::pages::episode_layout::EpisodeLayout;
+use crate::pages::feed::Feed;
+use crate::pages::history::PodHistory;
+use crate::pages::home::Home;
+use crate::pages::person::Person;
+use crate::pages::playlist_detail::PlaylistDetail;
+use crate::pages::playlists::Playlists;
+use crate::pages::podcast_layout::PodLayout;
+use crate::pages::podcasts::Podcasts;
+use crate::pages::queue::Queue;
+use crate::pages::routes::Route;
+use crate::pages::saved::Saved;
+use crate::pages::search::Search;
+use crate::pages::search_new::SearchNew;
+use crate::pages::settings::Settings;
+use crate::pages::shared_episode::SharedEpisode;
+use crate::pages::subscribed_people::SubscribedPeople;
+use crate::pages::user_stats::UserStats;
+use crate::pages::youtube_layout::YouTubeLayout;
+
 use yew_router::history::BrowserHistory;
 use yew_router::history::History;
 
 #[cfg(feature = "server_build")]
-use {components::login::ChangeServer, components::login::LogOut, components::login::Login};
+use pages::login::{ChangeServer, LogOut, Login};
 
 #[cfg(not(feature = "server_build"))]
 use {
-    components::downloads_tauri::Downloads as LocalDownloads,
-    components::login_tauri::ChangeServer, components::login_tauri::LogOut,
-    components::login_tauri::Login,
+    pages::downloads_tauri::Downloads as LocalDownloads,
+    pages::login_tauri::{ChangeServer, LogOut, Login},
 };
 
 // Yew Imports
-use components::context::AppState;
+use crate::components::context::AppState;
 use i18nrs::yew::use_translation;
 use i18nrs::yew::{I18nProvider, I18nProviderConfig};
 use requests::setting_reqs::call_get_server_default_language;
@@ -106,31 +103,31 @@ pub fn not_found() -> Html {
 }
 fn switch(route: Route) -> Html {
     match route {
-        Route::Login => html! { <Login /> },
-        Route::Home => html! { <Home /> },
-        Route::Feed => html! { <Feed /> },
-        Route::NotFound => html! { <NotFound /> },
         Route::ChangeServer => html! { <ChangeServer /> },
+        Route::Downloads => html! { <Downloads /> },
+        Route::Episode => html! { <Episode /> },
+        Route::EpisodeLayout => html! { <EpisodeLayout /> },
+        Route::Feed => html! { <Feed /> },
+        Route::Home => html! { <Home /> },
+        Route::Login => html! { <Login /> },
+        Route::LogOut => html! { <LogOut /> },
+        Route::NotFound => html! { <NotFound /> },
+        Route::OAuthCallback => html! { <OAuthCallback /> },
+        Route::Person { name } => html! { <Person name={name.clone()} /> },
+        Route::PlaylistDetail { id } => html! { <PlaylistDetail {id} /> },
+        Route::Playlists => html! { <Playlists /> },
+        Route::Podcasts => html! { <Podcasts /> },
+        Route::PodHistory => html! { <PodHistory /> },
+        Route::PodLayout => html! { <PodLayout /> },
         Route::Queue => html! { <Queue /> },
         Route::Saved => html! { <Saved /> },
-        Route::Settings => html! { <Settings /> },
-        Route::PodHistory => html! { <PodHistory /> },
-        Route::SubscribedPeople => html! { <SubscribedPeople /> },
-        Route::Downloads => html! { <Downloads /> },
         Route::Search => html! { <Search on_search={Callback::from(move |_| {})} /> },
-        Route::UserStats => html! { <UserStats /> },
-        Route::LogOut => html! { <LogOut /> },
         Route::SearchNew => html! { <SearchNew /> },
-        Route::PodLayout => html! { <PodLayout /> },
+        Route::Settings => html! { <Settings /> },
         Route::SharedEpisode { url_key } => html! { <SharedEpisode url_key={url_key.clone()} /> },
-        Route::EpisodeLayout => html! { <EpisodeLayout /> },
-        Route::Podcasts => html! { <Podcasts /> },
+        Route::SubscribedPeople => html! { <SubscribedPeople /> },
+        Route::UserStats => html! { <UserStats /> },
         Route::YoutubeLayout => html! { <YouTubeLayout /> },
-        Route::Playlists => html! { <Playlists /> },
-        Route::Episode => html! { <Episode /> },
-        Route::Person { name } => html! { <Person name={name.clone()} /> },
-        Route::OAuthCallback => html! { <OAuthCallback /> },
-        Route::PlaylistDetail { id } => html! { <PlaylistDetail {id} /> },
         #[cfg(not(feature = "server_build"))]
         Route::LocalDownloads => html! { <LocalDownloads /> },
         #[cfg(feature = "server_build")]

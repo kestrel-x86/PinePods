@@ -1,7 +1,7 @@
 use crate::components::audio::AudioPlayerProps;
 use crate::components::notification_center::TaskProgress;
-use crate::components::podcast_layout::ClickedFeedURL;
-use crate::components::podcasts::PodcastLayout;
+use crate::pages::podcast_layout::ClickedFeedURL;
+use crate::pages::podcasts::PodcastLayout;
 use crate::requests::episode::Episode;
 use crate::requests::login_requests::AddUserRequest;
 use crate::requests::login_requests::GetUserDetails;

@@ -1,10 +1,10 @@
-use super::app_drawer::App_drawer;
-use super::gen_components::{Search_nav, UseScrollToTop};
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState};
 use crate::components::gen_funcs::format_error_message;
 use crate::components::setting_components;
 use crate::requests::setting_reqs::call_user_admin_check;
+use crate::components::app_drawer::App_drawer;
+use crate::components::gen_components::{Search_nav, UseScrollToTop};
 use i18nrs::yew::use_translation;
 use yew::prelude::*;
 use yewdux::prelude::*;

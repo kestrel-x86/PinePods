@@ -1,13 +1,15 @@
-use super::app_drawer::App_drawer;
-use super::gen_components::{empty_message, on_shownotes_click, Search_nav, UseScrollToTop};
+use crate::components::app_drawer::App_drawer;
 use crate::components::audio::on_play_pause;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState};
 use crate::components::episode_list_item::EpisodeListItem;
-use crate::components::episodes_layout::AppStateMsg;
+use crate::components::gen_components::{
+    empty_message, on_shownotes_click, Search_nav, UseScrollToTop,
+};
 use crate::components::gen_funcs::{
     format_datetime, match_date_format, parse_date, sanitize_html_with_blank_target,
 };
+use crate::pages::episode_layout::AppStateMsg;
 use crate::requests::search_pods::{call_search_database, SearchRequest, SearchResponse};
 use async_std::task::sleep;
 use gloo_events::EventListener;
@@ -195,7 +197,7 @@ pub fn search(_props: &SearchProps) -> Html {
     } else {
         i18n.t("search.search_for_podcast_episode_description")
     };
-    
+
     // Pre-compute button text
     let go_text = i18n.t("search.go");
     let search_text = i18n.t("search.search");

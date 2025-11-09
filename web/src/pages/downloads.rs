@@ -1,7 +1,8 @@
-use super::app_drawer::App_drawer;
-use super::gen_components::{empty_message, FallbackImage, PageType, Search_nav, UseScrollToTop};
+use crate::components::app_drawer::App_drawer;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
+use crate::components::context_menu_button::PageType;
+use crate::components::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
 
 use crate::components::episode_list_item::EpisodeListItem;
 use crate::requests::episode::Episode;
@@ -141,13 +142,17 @@ pub fn downloads() -> Html {
                                 {
                                     let dispatch_local = dispatch.clone();
                                     wasm_bindgen_futures::spawn_local(async move {
-                                        if let Ok(local_episodes) = crate::components::downloads_tauri::fetch_local_episodes().await {
+                                        if let Ok(local_episodes) =
+                                            crate::pages::downloads_tauri::fetch_local_episodes()
+                                                .await
+                                        {
                                             let local_episode_ids: Vec<i32> = local_episodes
                                                 .iter()
                                                 .map(|ep| ep.episodeid)
                                                 .collect();
                                             dispatch_local.reduce_mut(move |state| {
-                                                state.locally_downloaded_episodes = Some(local_episode_ids);
+                                                state.locally_downloaded_episodes =
+                                                    Some(local_episode_ids);
                                             });
                                         }
                                     });

@@ -1,4 +1,4 @@
-use crate::{components::podcast_layout::ClickedFeedURL, requests::episode::Episode};
+use crate::{pages::podcast_layout::ClickedFeedURL, requests::episode::Episode};
 use anyhow::Error;
 use chrono::DateTime;
 use gloo_net::http::Request;

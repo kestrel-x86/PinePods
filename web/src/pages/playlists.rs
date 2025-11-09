@@ -1,5 +1,5 @@
-use super::app_drawer::App_drawer;
-use super::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
+use crate::components::app_drawer::App_drawer;
+use crate::components::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState};
 use crate::components::gen_funcs::format_error_message;

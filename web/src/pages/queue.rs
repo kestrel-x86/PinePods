@@ -1,12 +1,16 @@
-use super::app_drawer::App_drawer;
-use super::gen_components::{empty_message, on_shownotes_click, Search_nav, UseScrollToTop, PageType};
+use crate::components::app_drawer::App_drawer;
+use crate::components::context_menu_button::PageType;
+use crate::components::gen_components::{
+    empty_message, on_shownotes_click, Search_nav, UseScrollToTop,
+};
+
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState};
 use crate::components::episode_list_item::EpisodeListItem;
-use crate::components::episodes_layout::AppStateMsg;
 use crate::components::gen_funcs::{
     format_datetime, match_date_format, parse_date, sanitize_html_with_blank_target,
 };
+use crate::pages::episode_layout::AppStateMsg;
 use crate::requests::episode::Episode;
 
 use crate::components::virtual_list::DragCallbacks;
@@ -138,13 +142,17 @@ pub fn queue() -> Html {
                                 {
                                     let dispatch_local = dispatch.clone();
                                     wasm_bindgen_futures::spawn_local(async move {
-                                        if let Ok(local_episodes) = crate::components::downloads_tauri::fetch_local_episodes().await {
+                                        if let Ok(local_episodes) =
+                                            crate::pages::downloads_tauri::fetch_local_episodes()
+                                                .await
+                                        {
                                             let local_episode_ids: Vec<i32> = local_episodes
                                                 .iter()
                                                 .map(|ep| ep.episodeid)
                                                 .collect();
                                             dispatch_local.reduce_mut(move |state| {
-                                                state.locally_downloaded_episodes = Some(local_episode_ids);
+                                                state.locally_downloaded_episodes =
+                                                    Some(local_episode_ids);
                                             });
                                         }
                                     });

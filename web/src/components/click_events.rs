@@ -1,5 +1,5 @@
 use crate::components::context::AppState;
-use crate::components::podcast_layout::ClickedFeedURL;
+use crate::pages::podcast_layout::ClickedFeedURL;
 use crate::requests::pod_req::{call_check_podcast, call_get_podcast_id};
 use crate::requests::search_pods::{
     call_get_podcast_episodes, call_get_youtube_episodes, call_parse_podcast_url,

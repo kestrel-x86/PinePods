@@ -1,5 +1,4 @@
-use super::app_drawer::App_drawer;
-use super::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
+use crate::components::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, PodcastState, UIState};
 use crate::components::gen_funcs::format_error_message;
@@ -9,6 +8,7 @@ use crate::requests::pod_req::{
     RemovePodcastValuesName,
 };
 use crate::requests::search_pods::{call_parse_podcast_url, UnifiedPodcast};
+use crate::components::app_drawer::App_drawer;
 use gloo::events::EventListener;
 use i18nrs::yew::use_translation;
 use serde::{Deserialize, Serialize};
@@ -194,7 +194,7 @@ pub fn podcast_item(props: &PodcastProps) -> Html {
     let remove_error_msg = i18n.t("podcast_layout.remove_error");
     let podcast_added_msg = i18n.t("podcast_layout.podcast_added");
     let add_error_msg = i18n.t("podcast_layout.add_error");
-    
+
     // Pre-capture UI strings
     let show_less_text = i18n.t("podcast_layout.show_less");
     let show_more_text = i18n.t("podcast_layout.show_more");
@@ -290,8 +290,7 @@ pub fn podcast_item(props: &PodcastProps) -> Html {
                                 state.added_podcast_urls.remove(&podcast_url);
                             });
                             dispatch.reduce_mut(|state| {
-                                state.info_message =
-                                    Some(podcast_removed_msg);
+                                state.info_message = Some(podcast_removed_msg);
                             });
                         }
                         Err(e) => {

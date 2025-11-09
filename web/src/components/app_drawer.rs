@@ -1,6 +1,6 @@
-use super::routes::Route;
 use crate::components::context::{AppState, UserStatsStore};
 use crate::components::navigation::use_back_button;
+use crate::pages::routes::Route;
 use crate::requests::pod_req::{call_get_pinepods_version, connect_to_episode_websocket};
 use i18nrs::yew::use_translation;
 use wasm_bindgen_futures::spawn_local;

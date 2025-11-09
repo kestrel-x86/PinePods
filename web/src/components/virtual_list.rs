@@ -1,5 +1,5 @@
+use crate::components::context_menu_button::PageType;
 use crate::components::episode_list_item::EpisodeListItem;
-use crate::components::gen_components::PageType;
 use crate::requests::episode::Episode;
 use gloo::events::EventListener;
 use i18nrs::yew::use_translation;

@@ -1,5 +1,5 @@
-use super::app_drawer::App_drawer;
-use super::gen_components::{
+use crate::components::app_drawer::App_drawer;
+use crate::components::gen_components::{
     empty_message, on_shownotes_click, use_long_press, Search_nav, UseScrollToTop,
 };
 

@@ -1,4 +1,4 @@
-use super::app_drawer::App_drawer;
+use crate::components::app_drawer::App_drawer;
 use crate::components::audio::AudioPlayer;
 use crate::components::click_events::create_on_title_click;
 use crate::components::context::{AppState, ExpandedDescriptions, FilterState, UIState};

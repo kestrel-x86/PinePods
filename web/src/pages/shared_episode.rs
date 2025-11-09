@@ -1,4 +1,4 @@
-use super::gen_components::{empty_message, FallbackImage, UseScrollToTop};
+use crate::components::gen_components::{empty_message, FallbackImage, UseScrollToTop};
 use crate::components::audio::on_play_click_shared;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState};

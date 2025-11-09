@@ -1,5 +1,5 @@
-use super::app_drawer::App_drawer;
-use super::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
+use crate::components::app_drawer::App_drawer;
+use crate::components::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
 use crate::components::audio::on_play_click;
 use crate::components::audio::AudioPlayer;
 use crate::components::click_events::create_on_title_click;

@@ -1,10 +1,9 @@
-use super::app_drawer::App_drawer;
+use crate::components::app_drawer::App_drawer;
 use crate::components::audio::on_play_pause;
 use crate::components::audio::AudioPlayer;
 use crate::components::click_events::create_on_title_click;
 use crate::components::context::ExpandedDescriptions;
 use crate::components::context::{AppState, UIState};
-use crate::components::episodes_layout::AppStateMsg as EpisodeMsg;
 use crate::components::gen_components::on_shownotes_click;
 use crate::components::gen_components::{FallbackImage, Search_nav, UseScrollToTop};
 use crate::components::gen_funcs::format_error_message;
@@ -13,6 +12,7 @@ use crate::components::gen_funcs::{
     strip_images_from_html, truncate_description, unix_timestamp_to_datetime_string,
 };
 use crate::components::safehtml::SafeHtml;
+use crate::pages::episode_layout::AppStateMsg as EpisodeMsg;
 use crate::requests::people_req::{
     call_get_person_subscriptions, call_subscribe_to_person, call_unsubscribe_from_person,
 };
