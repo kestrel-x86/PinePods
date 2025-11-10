@@ -2,7 +2,7 @@ use crate::components::audio::on_play_pause;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
 use crate::components::gen_components::{on_shownotes_click, EpisodeModal, FallbackImage};
 
-use crate::components::context_menu_button::{ContextButton, PageType};
+use crate::components::context_menu_button::{ContextMenuButton, PageType};
 use crate::components::gen_funcs::{
     format_datetime, match_date_format, parse_date, sanitize_html_with_blank_target, use_long_press,
 };
@@ -487,7 +487,7 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
 
                                 <div class="hidden sm:block"> // Standard desktop context button
                                     <div ref={context_button_ref.clone()}>
-                                        <ContextButton episode={props.episode.clone()} page_type={props.page_type.clone()} />
+                                        <ContextMenuButton episode={props.episode.clone()} page_type={props.page_type.clone()} />
                                     </div>
                                 </div>
                             }
@@ -500,7 +500,7 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
             {
                 if *show_context_menu {
                     html! {
-                        <ContextButton
+                        <ContextMenuButton
                             episode={props.episode.clone()}
                             page_type={props.page_type.clone()}
                             show_menu_only={true}

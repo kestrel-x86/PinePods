@@ -55,7 +55,7 @@ pub struct ContextButtonProps {
     pub on_close: Option<Callback<()>>,
 }
 
-#[function_component(ContextButton)]
+#[function_component(ContextMenuButton)]
 pub fn context_button(props: &ContextButtonProps) -> Html {
     let dropdown_open = use_state(|| false);
     let (post_state, post_dispatch) = use_store::<AppState>();
