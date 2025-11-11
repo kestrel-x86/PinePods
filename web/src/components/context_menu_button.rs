@@ -315,7 +315,7 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
                         let formatted_info = format_error_message(&success_message.to_string());
                         post_state.reduce_mut(|state| {
                             state.info_message = Option::from(format!("{}", formatted_info));
-                            if !state.saved_episode_ids().contains(&episode.episodeid) {
+                            if !state.saved_episode_ids().any(|id| id == episode.episodeid) {
                                 state.saved_episodes.push(ep);
                             }
                         });

@@ -159,8 +159,8 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn saved_episode_ids(&self) -> Vec<i32> {
-        self.saved_episodes.iter().map(|e| e.episodeid).collect()
+    pub fn saved_episode_ids(&self) -> impl Iterator<Item = i32> + '_ {
+        self.saved_episodes.iter().map(|e| e.episodeid)
     }
 }
 
