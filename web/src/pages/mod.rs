@@ -6,10 +6,12 @@ pub(crate) mod episode_layout;
 pub(crate) mod feed;
 pub(crate) mod history;
 pub(crate) mod home;
+pub(crate) mod internal_error;
 #[cfg(feature = "server_build")]
 pub(crate) mod login;
 #[cfg(not(feature = "server_build"))]
 pub(crate) mod login_tauri;
+pub(crate) mod not_found;
 pub(crate) mod person;
 pub(crate) mod playlist_detail;
 pub(crate) mod playlists;
