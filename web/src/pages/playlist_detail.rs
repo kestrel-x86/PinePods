@@ -2,6 +2,7 @@ use crate::components::app_drawer::App_drawer;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState};
 use crate::components::gen_components::{Search_nav, UseScrollToTop};
+use crate::components::loading::Loading;
 use crate::components::virtual_list::VirtualList;
 use crate::requests::pod_req;
 use i18nrs::yew::use_translation;
@@ -121,14 +122,9 @@ pub fn playlist_detail(props: &Props) -> Html {
                 <UseScrollToTop />
 
                 if *loading {
-                    <div class="loading-animation">
-                        <div class="frame1"></div>
-                        <div class="frame2"></div>
-                        <div class="frame3"></div>
-                        <div class="frame4"></div>
-                        <div class="frame5"></div>
-                        <div class="frame6"></div>
-                    </div>
+                    {
+                        html! { <Loading/> }
+                    }
                 } else {
                     if let Some(error_msg) = &*error {
                         <div class="error-message">

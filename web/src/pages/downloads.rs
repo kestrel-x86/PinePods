@@ -3,6 +3,7 @@ use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
 use crate::components::context_menu_button::PageType;
 use crate::components::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
+use crate::components::loading::Loading;
 
 use crate::components::episode_list_item::EpisodeListItem;
 use crate::requests::episode::Episode;
@@ -299,16 +300,7 @@ pub fn downloads() -> Html {
             <UseScrollToTop />
                 if *loading { // If loading is true, display the loading animation
                     {
-                        html! {
-                            <div class="loading-animation">
-                                <div class="frame1"></div>
-                                <div class="frame2"></div>
-                                <div class="frame3"></div>
-                                <div class="frame4"></div>
-                                <div class="frame5"></div>
-                                <div class="frame6"></div>
-                            </div>
-                        }
+                        html! { <Loading/> }
                     }
                 } else {
                     {

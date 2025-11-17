@@ -3,6 +3,7 @@ use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState};
 use crate::components::episode_list_item::EpisodeListItem;
 use crate::components::gen_components::{empty_message, Search_nav, UseScrollToTop};
+use crate::components::loading::Loading;
 use crate::components::virtual_list::VirtualList;
 use crate::requests::episode::Episode;
 use crate::requests::pod_req;
@@ -158,16 +159,7 @@ pub fn feed() -> Html {
             <UseScrollToTop />
             {
                 if *loading { // If loading is true, display the loading animation
-                    html! {
-                        <div class="loading-animation">
-                            <div class="frame1"></div>
-                            <div class="frame2"></div>
-                            <div class="frame3"></div>
-                            <div class="frame4"></div>
-                            <div class="frame5"></div>
-                            <div class="frame6"></div>
-                        </div>
-                    }
+                    html! { <Loading/> }
                 } else {
                     if let Some(recent_eps) = state.server_feed_results.clone() {
                         let int_recent_eps = recent_eps.clone();

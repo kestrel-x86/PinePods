@@ -7,6 +7,7 @@ use crate::components::gen_funcs::{
     format_error_message, get_default_sort_direction, get_filter_preference, set_filter_preference,
 };
 use crate::components::host_component::HostDropdown;
+use crate::components::loading::Loading;
 use crate::components::virtual_list::VirtualList;
 use crate::pages::podcast_layout::ClickedFeedURL;
 use crate::requests::pod_req::{
@@ -3152,16 +3153,7 @@ pub fn episode_layout() -> Html {
                 }
                 {
                     if *loading { // If loading is true, display the loading animation
-                        html! {
-                            <div class="loading-animation">
-                                <div class="frame1"></div>
-                                <div class="frame2"></div>
-                                <div class="frame3"></div>
-                                <div class="frame4"></div>
-                                <div class="frame5"></div>
-                                <div class="frame6"></div>
-                            </div>
-                        }
+                        html! { <Loading/> }
                     } else {
                         html! {
                             <>

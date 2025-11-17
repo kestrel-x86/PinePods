@@ -3,6 +3,7 @@ use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
 use crate::components::gen_components::{empty_message, Search_nav, UseScrollToTop};
 use crate::components::virtual_list::VirtualList;
+use crate::components::loading::Loading;
 use crate::requests::episode::Episode;
 use crate::requests::people_req::{self, PersonSubscription};
 use i18nrs::yew::use_translation;
@@ -248,16 +249,7 @@ pub fn subscribed_people() -> Html {
             <UseScrollToTop />
             {
                 if *loading {
-                    html! {
-                        <div class="loading-animation">
-                            <div class="frame1"></div>
-                            <div class="frame2"></div>
-                            <div class="frame3"></div>
-                            <div class="frame4"></div>
-                            <div class="frame5"></div>
-                            <div class="frame6"></div>
-                        </div>
-                    }
+                    html! { <Loading/> }
                 } else {
                     html! {
                         <div>

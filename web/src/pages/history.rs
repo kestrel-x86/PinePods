@@ -2,6 +2,7 @@ use crate::components::app_drawer::App_drawer;
 use crate::components::gen_components::{
     empty_message, on_shownotes_click, use_long_press, Search_nav, UseScrollToTop,
 };
+use crate::components::loading::Loading;
 
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState};
@@ -207,16 +208,7 @@ pub fn history() -> Html {
             <UseScrollToTop />
             {
                 if *loading { // If loading is true, display the loading animation
-                    html! {
-                        <div class="loading-animation">
-                            <div class="frame1"></div>
-                            <div class="frame2"></div>
-                            <div class="frame3"></div>
-                            <div class="frame4"></div>
-                            <div class="frame5"></div>
-                            <div class="frame6"></div>
-                        </div>
-                    }
+                    html! { html! { <Loading/> } }
                 } else {
                     html! {
                         <>

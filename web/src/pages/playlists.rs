@@ -1,3 +1,4 @@
+use crate::components::loading::Loading;
 use crate::components::app_drawer::App_drawer;
 use crate::components::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
 use crate::components::audio::AudioPlayer;
@@ -1124,15 +1125,7 @@ pub fn playlists() -> Html {
                                 <label class="block mb-2 text-sm font-medium">{&i18n.t("playlists.filter_by_podcasts")}</label>
                                 {
                                     if *loading_podcasts {
-                                        html! {
-                                            <div class="flex justify-center p-4">
-                                                <div class="loading-animation">
-                                                    <div class="frame1"></div>
-                                                    <div class="frame2"></div>
-                                                    <div class="frame3"></div>
-                                                </div>
-                                            </div>
-                                        }
+                                        html! { <Loading/> }
                                     } else {
                                         html! {
                                             <PodcastSelector
@@ -1581,16 +1574,7 @@ pub fn playlists() -> Html {
                             }
                         }
                     } else {
-                        html! {
-                            <div class="loading-animation">
-                                <div class="frame1"></div>
-                                <div class="frame2"></div>
-                                <div class="frame3"></div>
-                                <div class="frame4"></div>
-                                <div class="frame5"></div>
-                                <div class="frame6"></div>
-                            </div>
-                        }
+                        html! { <Loading/> }
                     }
                 }
 

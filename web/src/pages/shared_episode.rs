@@ -1,3 +1,4 @@
+use crate::components::loading::Loading;
 use crate::components::gen_components::{empty_message, FallbackImage, UseScrollToTop};
 use crate::components::audio::on_play_click_shared;
 use crate::components::audio::AudioPlayer;
@@ -144,16 +145,7 @@ pub fn shared_episode(_props: &SharedProps) -> Html {
             <UseScrollToTop />
             {
                 if *loading { // If loading is true, display the loading animation
-                    html! {
-                        <div class="loading-animation">
-                            <div class="frame1"></div>
-                            <div class="frame2"></div>
-                            <div class="frame3"></div>
-                            <div class="frame4"></div>
-                            <div class="frame5"></div>
-                            <div class="frame6"></div>
-                        </div>
-                    }
+                    html! { <Loading/> }
                 } else {
                     if let Some(episode) = state.shared_fetched_episode.clone() {
                         let episode_url_clone = episode.episode.episodeurl.clone();

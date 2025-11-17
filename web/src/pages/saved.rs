@@ -1,3 +1,4 @@
+use crate::components::loading::Loading;
 use crate::components::app_drawer::App_drawer;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
@@ -220,16 +221,7 @@ pub fn saved() -> Html {
             <UseScrollToTop />
             {
                 if *loading { // If loading is true, display the loading animation
-                    html! {
-                        <div class="loading-animation">
-                            <div class="frame1"></div>
-                            <div class="frame2"></div>
-                            <div class="frame3"></div>
-                            <div class="frame4"></div>
-                            <div class="frame5"></div>
-                            <div class="frame6"></div>
-                        </div>
-                    }
+                    html! { <Loading/> }
                 } else {
                     html! {
                         <>

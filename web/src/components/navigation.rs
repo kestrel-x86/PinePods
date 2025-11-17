@@ -1,6 +1,7 @@
 // navigation.rs
 use crate::components::context::AppState;
 use crate::components::gen_funcs::generate_gravatar_url;
+use crate::components::loading::Loading;
 use crate::requests::login_requests::{
     call_get_time_info, call_verify_key, use_check_authentication,
 };
@@ -270,14 +271,7 @@ pub fn navigation_handler(props: &NavigationHandlerProps) -> Html {
 
     html! {
         if *loading {
-            <div class="loading-animation">
-                <div class="frame1"></div>
-                <div class="frame2"></div>
-                <div class="frame3"></div>
-                <div class="frame4"></div>
-                <div class="frame5"></div>
-                <div class="frame6"></div>
-            </div>
+            { html! { <Loading /> } }
         } else {
             { props.children.clone() }
         }

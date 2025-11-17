@@ -8,6 +8,7 @@ use crate::components::episode_list_item::EpisodeListItem;
 use crate::components::gen_components::on_shownotes_click;
 use crate::components::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
 use crate::components::gen_funcs::{format_datetime, format_time, match_date_format, parse_date};
+use crate::components::loading::Loading;
 use crate::pages::routes::Route;
 use crate::requests::episode::Episode;
 use crate::requests::pod_req::Playlist;
@@ -215,14 +216,9 @@ pub fn home() -> Html {
             <UseScrollToTop />
 
             if *loading {
-                <div class="loading-animation">
-                    <div class="frame1"></div>
-                    <div class="frame2"></div>
-                    <div class="frame3"></div>
-                    <div class="frame4"></div>
-                    <div class="frame5"></div>
-                    <div class="frame6"></div>
-                </div>
+                {
+                    html! { <Loading/> }
+                }
             } else {
                 if let Some(home_data) = &state.home_overview {
                     <div class="space-y-8">
