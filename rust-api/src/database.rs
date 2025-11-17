@@ -11738,28 +11738,29 @@ impl DatabasePool {
         
         tracing::info!("Downloaded {} unique subscriptions and {} unique removals from ALL devices", all_subscriptions.len(), all_removals.len());
         
-        // Step 3: Get episode actions from ALL devices with pagination support
+        // Step 3: Get episode actions with pagination support
+        // DON'T filter by device - this would exclude actions with NULL DeviceID
         // The server limits responses to 25k actions, so we need to loop until we get all of them
         let mut all_episode_actions = Vec::new();
         const MAX_ACTIONS_PER_BATCH: usize = 25000;
 
-        for device_id in &devices {
-            tracing::info!("Getting episode actions from device: {}", device_id);
+        tracing::info!("Getting ALL episode actions (no device filter to include NULL device actions)");
 
-            let initial_since = if let Some(since) = since_timestamp {
-                since.timestamp()
-            } else {
-                0
-            };
+        let initial_since = if let Some(since) = since_timestamp {
+            since.timestamp()
+        } else {
+            0
+        };
 
-            let mut current_since = initial_since;
-            let mut device_total_actions = 0;
+        let mut current_since = initial_since;
+        let mut total_actions_fetched = 0;
 
-            loop {
-                let episode_actions_url = format!("{}/api/2/episodes/{}.json?since={}&device={}",
-                    gpodder_url.trim_end_matches('/'), username, current_since, device_id);
+        loop {
+            // Fetch WITHOUT device parameter to get ALL actions including those with NULL DeviceID
+            let episode_actions_url = format!("{}/api/2/episodes/{}.json?since={}",
+                gpodder_url.trim_end_matches('/'), username, current_since);
 
-                let device_response = if gpodder_url == "http://localhost:8042" {
+            let device_response = if gpodder_url == "http://localhost:8042" {
                     let client = reqwest::Client::new();
                     client.get(&episode_actions_url)
                         .header("X-GPodder-Token", password)
@@ -11781,67 +11782,95 @@ impl DatabasePool {
                     }
                 };
 
-                match device_response {
-                    Ok(resp) if resp.status().is_success() => {
-                        let response_text = resp.text().await
-                            .map_err(|e| AppError::internal(&format!("Failed to get episode actions response text: {}", e)))?;
+            match device_response {
+                Ok(resp) if resp.status().is_success() => {
+                    let response_text = resp.text().await
+                        .map_err(|e| AppError::internal(&format!("Failed to get episode actions response text: {}", e)))?;
 
-                        let episode_data: serde_json::Value = serde_json::from_str(&response_text)
-                            .map_err(|e| AppError::internal(&format!("Failed to parse episode actions response: {}", e)))?;
+                    let episode_data: serde_json::Value = serde_json::from_str(&response_text)
+                        .map_err(|e| AppError::internal(&format!("Failed to parse episode actions response: {}", e)))?;
 
-                        let actions = episode_data.get("actions").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-                        let batch_size = actions.len();
-                        let new_timestamp = episode_data.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(current_since);
+                    let actions = episode_data.get("actions").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+                    let batch_size = actions.len();
+                    let new_timestamp = episode_data.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(current_since);
 
-                        tracing::info!("Fetched {} episode actions from device {} (since={})", batch_size, device_id, current_since);
+                    tracing::info!("Fetched {} episode actions (since={})", batch_size, current_since);
 
-                        // Add actions from this batch
-                        for action in actions {
-                            all_episode_actions.push(action);
-                        }
-                        device_total_actions += batch_size;
-
-                        // If we got less than MAX_ACTIONS_PER_BATCH, we've reached the end
-                        if batch_size < MAX_ACTIONS_PER_BATCH {
-                            tracing::info!("Reached end of episode actions for device {} (got {} < {} limit)", device_id, batch_size, MAX_ACTIONS_PER_BATCH);
-                            break;
-                        }
-
-                        // Update since to the timestamp from the response for next iteration
-                        if new_timestamp > current_since {
-                            current_since = new_timestamp;
-                            tracing::info!("Updated since timestamp to {} for next batch", current_since);
-                        } else {
-                            tracing::warn!("Timestamp didn't advance, stopping pagination to avoid infinite loop");
-                            break;
-                        }
+                    // Add actions from this batch
+                    for action in actions {
+                        all_episode_actions.push(action);
                     }
-                    Ok(resp) => {
-                        tracing::warn!("Device {} episode actions returned error: {}", device_id, resp.status());
+                    total_actions_fetched += batch_size;
+
+                    // If we got less than MAX_ACTIONS_PER_BATCH, we've reached the end
+                    if batch_size < MAX_ACTIONS_PER_BATCH {
+                        tracing::info!("Reached end of episode actions (got {} < {} limit)", batch_size, MAX_ACTIONS_PER_BATCH);
                         break;
                     }
-                    Err(e) => {
-                        tracing::warn!("Failed to get episode actions from device {}: {}", device_id, e);
+
+                    // Update since to the timestamp from the response for next iteration
+                    if new_timestamp > current_since {
+                        current_since = new_timestamp;
+                        tracing::info!("Updated since timestamp to {} for next batch", current_since);
+                    } else {
+                        tracing::warn!("Timestamp didn't advance, stopping pagination to avoid infinite loop");
                         break;
                     }
                 }
+                Ok(resp) => {
+                    tracing::warn!("Episode actions request returned error: {}", resp.status());
+                    break;
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to get episode actions: {}", e);
+                    break;
+                }
             }
-
-            tracing::info!("Device {} total: {} episode actions", device_id, device_total_actions);
         }
 
-        tracing::info!("Downloaded {} episode actions from ALL devices", all_episode_actions.len());
-        
+        tracing::info!("Total: {} episode actions fetched", total_actions_fetched);
+
+        println!("\n========== FORCE SYNC EPISODE ACTIONS DOWNLOAD COMPLETE ==========");
+        println!("📊 Downloaded {} total episode actions from ALL {} devices", all_episode_actions.len(), devices.len());
+
+        // Check if changelog-news-168 is in the downloaded actions
+        let has_changelog_168 = all_episode_actions.iter().any(|a| {
+            a.get("episode")
+                .and_then(|e| e.as_str())
+                .map(|s| s.contains("changelog-news-168"))
+                .unwrap_or(false)
+        });
+
+        if has_changelog_168 {
+            println!("🎯 FOUND changelog-news-168 in downloaded episode actions!");
+            // Find which device it came from
+            if let Some(action) = all_episode_actions.iter().find(|a| {
+                a.get("episode")
+                    .and_then(|e| e.as_str())
+                    .map(|s| s.contains("changelog-news-168"))
+                    .unwrap_or(false)
+            }) {
+                println!("   Device: {}", action.get("device").and_then(|d| d.as_str()).unwrap_or("unknown"));
+                println!("   Episode URL: {}", action.get("episode").and_then(|e| e.as_str()).unwrap_or("unknown"));
+                println!("   Position: {}", action.get("position").and_then(|p| p.as_i64()).unwrap_or(0));
+                println!("   Timestamp: {}", action.get("timestamp").and_then(|t| t.as_i64()).unwrap_or(0));
+            }
+        } else {
+            println!("❌ changelog-news-168 NOT FOUND in downloaded episode actions!");
+            println!("   This means the GPodder API never returned it across any device.");
+        }
+        println!("==================================================================\n");
+
         // Step 4: Process all subscriptions (additions)
         let subscriptions_vec: Vec<String> = all_subscriptions.into_iter().collect();
         self.process_gpodder_subscriptions(user_id, &subscriptions_vec).await?;
-        
+
         // Step 5: Process all subscription removals
         let removals_vec: Vec<String> = all_removals.into_iter().collect();
         if !removals_vec.is_empty() {
             self.process_gpodder_subscription_removals(user_id, &removals_vec).await?;
         }
-        
+
         // Step 6: Process all episode actions
         if !all_episode_actions.is_empty() {
             if let Err(e) = self.apply_remote_episode_actions(user_id, &all_episode_actions).await {
@@ -11976,15 +12005,18 @@ impl DatabasePool {
         let mut all_episode_actions = Vec::new();
         const MAX_ACTIONS_PER_BATCH: usize = 25000;
 
-        for device_id in &devices {
-            tracing::info!("Getting episode actions from device: {}", device_id);
+        // DON'T filter by device for initial sync - this would exclude actions with NULL DeviceID
+        // The GPodder API filters WHERE DeviceID = X, which excludes NULL device actions
+        // For full sync, we want ALL actions regardless of device
+        tracing::info!("Getting ALL episode actions (not filtering by device to include NULL device actions)");
 
-            let mut current_since: i64 = 0; // Start from epoch
-            let mut device_total_actions = 0;
+        let mut current_since: i64 = 0; // Start from epoch
+        let mut total_actions_fetched = 0;
 
-            loop {
-                let episode_actions_url = format!("{}/api/2/episodes/{}.json?since={}&device={}",
-                    gpodder_url.trim_end_matches('/'), username, current_since, device_id);
+        loop {
+            // Fetch WITHOUT device parameter to get ALL actions including those with NULL DeviceID
+            let episode_actions_url = format!("{}/api/2/episodes/{}.json?since={}",
+                gpodder_url.trim_end_matches('/'), username, current_since);
 
                 let response = if gpodder_url == "http://localhost:8042" {
                     let client = reqwest::Client::new();
@@ -11998,53 +12030,81 @@ impl DatabasePool {
                     }
                 };
 
-                match response {
-                    Ok(resp) if resp.status().is_success() => {
-                        let episode_data: serde_json::Value = resp.json().await
-                            .map_err(|e| AppError::internal(&format!("Failed to parse episode actions for device {}: {}", device_id, e)))?;
+            match response {
+                Ok(resp) if resp.status().is_success() => {
+                    let episode_data: serde_json::Value = resp.json().await
+                        .map_err(|e| AppError::internal(&format!("Failed to parse episode actions: {}", e)))?;
 
-                        let actions = episode_data.get("actions").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-                        let batch_size = actions.len();
-                        let new_timestamp = episode_data.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(current_since);
+                    let actions = episode_data.get("actions").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+                    let batch_size = actions.len();
+                    let new_timestamp = episode_data.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(current_since);
 
-                        tracing::info!("Fetched {} episode actions from device {} (since={})", batch_size, device_id, current_since);
+                    tracing::info!("Fetched {} episode actions (since={})", batch_size, current_since);
 
-                        // Add actions from this batch
-                        for action in actions {
-                            all_episode_actions.push(action);
-                        }
-                        device_total_actions += batch_size;
-
-                        // If we got less than MAX_ACTIONS_PER_BATCH, we've reached the end
-                        if batch_size < MAX_ACTIONS_PER_BATCH {
-                            tracing::info!("Reached end of episode actions for device {} (got {} < {} limit)", device_id, batch_size, MAX_ACTIONS_PER_BATCH);
-                            break;
-                        }
-
-                        // Update since to the timestamp from the response for next iteration
-                        if new_timestamp > current_since {
-                            current_since = new_timestamp;
-                            tracing::info!("Updated since timestamp to {} for next batch", current_since);
-                        } else {
-                            tracing::warn!("Timestamp didn't advance, stopping pagination to avoid infinite loop");
-                            break;
-                        }
+                    // Add actions from this batch
+                    for action in actions {
+                        all_episode_actions.push(action);
                     }
-                    Ok(resp) => {
-                        tracing::warn!("Failed to get episode actions from device {}: {}", device_id, resp.status());
-                        break; // Continue with other devices
+                    total_actions_fetched += batch_size;
+
+                    // If we got less than MAX_ACTIONS_PER_BATCH, we've reached the end
+                    if batch_size < MAX_ACTIONS_PER_BATCH {
+                        tracing::info!("Reached end of episode actions (got {} < {} limit)", batch_size, MAX_ACTIONS_PER_BATCH);
+                        break;
                     }
-                    Err(e) => {
-                        tracing::warn!("Error getting episode actions from device {}: {}", device_id, e);
-                        break; // Continue with other devices
+
+                    // Update since to the timestamp from the response for next iteration
+                    if new_timestamp > current_since {
+                        current_since = new_timestamp;
+                        tracing::info!("Updated since timestamp to {} for next batch", current_since);
+                    } else {
+                        tracing::warn!("Timestamp didn't advance, stopping pagination to avoid infinite loop");
+                        break;
                     }
                 }
+                Ok(resp) => {
+                    tracing::warn!("Failed to get episode actions: {}", resp.status());
+                    break;
+                }
+                Err(e) => {
+                    tracing::warn!("Error getting episode actions: {}", e);
+                    break;
+                }
             }
-
-            tracing::info!("Device {} total: {} episode actions", device_id, device_total_actions);
         }
 
-        tracing::info!("Total episode actions from all devices: {}", all_episode_actions.len());
+        tracing::info!("Total: {} episode actions fetched", total_actions_fetched);
+
+        println!("\n========== INITIAL SYNC EPISODE ACTIONS DOWNLOAD COMPLETE ==========");
+        println!("📊 Downloaded {} total episode actions from ALL {} devices", all_episode_actions.len(), devices.len());
+
+        // Check if changelog-news-168 is in the downloaded actions
+        let has_changelog_168 = all_episode_actions.iter().any(|a| {
+            a.get("episode")
+                .and_then(|e| e.as_str())
+                .map(|s| s.contains("changelog-news-168"))
+                .unwrap_or(false)
+        });
+
+        if has_changelog_168 {
+            println!("🎯 FOUND changelog-news-168 in downloaded episode actions!");
+            // Find which device it came from
+            if let Some(action) = all_episode_actions.iter().find(|a| {
+                a.get("episode")
+                    .and_then(|e| e.as_str())
+                    .map(|s| s.contains("changelog-news-168"))
+                    .unwrap_or(false)
+            }) {
+                println!("   Device: {}", action.get("device").and_then(|d| d.as_str()).unwrap_or("unknown"));
+                println!("   Episode URL: {}", action.get("episode").and_then(|e| e.as_str()).unwrap_or("unknown"));
+                println!("   Position: {}", action.get("position").and_then(|p| p.as_i64()).unwrap_or(0));
+                println!("   Timestamp: {}", action.get("timestamp").and_then(|t| t.as_i64()).unwrap_or(0));
+            }
+        } else {
+            println!("❌ changelog-news-168 NOT FOUND in downloaded episode actions!");
+            println!("   This means the GPodder API never returned it across any device.");
+        }
+        println!("====================================================================\n");
 
         // Step 3: Process all subscriptions and add missing podcasts FIRST
         // This ensures podcasts and their episodes are in the database before applying episode actions
@@ -12468,8 +12528,12 @@ impl DatabasePool {
 
     // Sync episode actions with gPodder service - matches Python episode actions sync with timestamp support
     async fn sync_episode_actions_with_gpodder(&self, gpodder_url: &str, username: &str, password: &str, device_name: &str, user_id: i32) -> AppResult<()> {
+        println!("\n========== STARTING EPISODE ACTIONS SYNC ==========");
+
         // Get last sync timestamp for incremental sync (BETTER than Python - follows GPodder spec)
         let since_timestamp = self.get_last_sync_timestamp(user_id).await?;
+
+        println!("📅 Last sync timestamp from DB: {:?}", since_timestamp);
         
         // Get local episode actions since last sync for efficient incremental sync
         let local_actions = if let Some(since) = since_timestamp {
@@ -12536,11 +12600,20 @@ impl DatabasePool {
             0
         };
 
+        println!("🔍 GPodder episode actions sync starting with since={} ({})",
+                 initial_since,
+                 if initial_since == 0 { "FULL SYNC" } else { "INCREMENTAL SYNC" });
+        println!("   Fetching from ALL devices (no device filter to include NULL device actions)");
+
         let mut current_since = initial_since;
 
         loop {
-            let download_url = format!("{}/api/2/episodes/{}.json?since={}&device={}",
-                gpodder_url.trim_end_matches('/'), username, current_since, device_name);
+            // DON'T filter by device - get actions from ALL devices including NULL device actions
+            // The 'since' parameter ensures we only get NEW actions (efficient incremental sync)
+            let download_url = format!("{}/api/2/episodes/{}.json?since={}",
+                gpodder_url.trim_end_matches('/'), username, current_since);
+
+            println!("📥 Fetching episode actions from: {}", download_url);
 
             // Use correct authentication based on internal vs external for download
             let response = if gpodder_url == "http://localhost:8042" {
@@ -12576,7 +12649,17 @@ impl DatabasePool {
                     let batch_size = actions.len();
                     let new_timestamp = episode_data.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(current_since);
 
-                    tracing::info!("Fetched {} episode actions (since={})", batch_size, current_since);
+                    // Check if changelog-news-168 is in this batch
+                    let has_changelog_168 = actions.iter().any(|a| {
+                        a.get("episode")
+                            .and_then(|e| e.as_str())
+                            .map(|s| s.contains("changelog-news-168"))
+                            .unwrap_or(false)
+                    });
+
+                    println!("📦 Fetched {} episode actions (since={}, response_timestamp={}) {}",
+                             batch_size, current_since, new_timestamp,
+                             if has_changelog_168 { "🎯 CONTAINS changelog-news-168" } else { "" });
 
                     // Add actions from this batch
                     for action in actions {
@@ -12608,7 +12691,22 @@ impl DatabasePool {
             }
         }
 
-        tracing::info!("Downloaded {} total remote episode actions", all_remote_actions.len());
+        println!("✅ Downloaded {} total remote episode actions across all batches", all_remote_actions.len());
+
+        // Check if changelog-news-168 is in the aggregated actions
+        let has_changelog_168 = all_remote_actions.iter().any(|a| {
+            a.get("episode")
+                .and_then(|e| e.as_str())
+                .map(|s| s.contains("changelog-news-168"))
+                .unwrap_or(false)
+        });
+
+        if has_changelog_168 {
+            println!("🎯 FOUND changelog-news-168 in aggregated remote actions before processing!");
+        } else {
+            println!("❌ changelog-news-168 NOT FOUND in aggregated remote actions!");
+            println!("   This means it was never returned by the GPodder API across all batches.");
+        }
 
         // Apply all remote actions locally
         if !all_remote_actions.is_empty() {
@@ -12653,19 +12751,30 @@ impl DatabasePool {
 
     // Apply remote episode actions locally - matches Python apply_episode_actions function exactly
     async fn apply_remote_episode_actions(&self, user_id: i32, actions: &[serde_json::Value]) -> AppResult<()> {
-        tracing::info!("Processing {} episode actions for user {}", actions.len(), user_id);
+        let total_actions = actions.len();
+        tracing::info!("Processing {} episode actions for user {}", total_actions, user_id);
+
         let mut applied_count = 0;
         let mut not_found_count = 0;
         let mut not_found_urls: Vec<String> = Vec::new();
         let mut changelog_168_found = false;
         let mut changelog_168_result = String::new();
 
+        // Process in batches with progress logging
+        const BATCH_SIZE: usize = 1000;
+        const LOG_INTERVAL: usize = 500; // Log progress every 500 actions
+
         // DEBUG: Log the first action to see its structure
         if !actions.is_empty() {
             tracing::info!("DEBUG: First episode action structure: {}", serde_json::to_string_pretty(&actions[0]).unwrap_or_else(|_| "failed to serialize".to_string()));
         }
 
-        for action in actions {
+        for (index, action) in actions.iter().enumerate() {
+            // Log progress periodically instead of for every action
+            if index > 0 && index % LOG_INTERVAL == 0 {
+                tracing::info!("Progress: {}/{} actions processed ({} applied, {} not found)",
+                              index, total_actions, applied_count, not_found_count);
+            }
             if let (Some(episode_url), Some(action_type)) = (
                 action["episode"].as_str(),
                 action["action"].as_str()
@@ -12701,11 +12810,7 @@ impl DatabasePool {
                                 if let Ok(episode_duration) = self.get_episode_duration(episode_id).await {
                                     let position_sec = position as i32;
                                     let remaining_time = episode_duration - position_sec;
-                                    
-                                    // Always log for debugging GPodder sync completion issues
-                                    println!("GPodder sync episode: {} - Duration: {}s, Position: {}s, Remaining: {}s", 
-                                             episode_url, episode_duration, position_sec, remaining_time);
-                                    
+
                                     // Mark complete if position is at/beyond the end OR within 60 seconds of completion
                                     if episode_duration > 0 && (position_sec >= episode_duration || remaining_time <= 60) {
                                         // At end or within 1 minute of completion - mark as complete
@@ -12713,11 +12818,19 @@ impl DatabasePool {
                                         match self.mark_episode_completed(episode_id, user_id, false).await {
                                             Ok(_) => {
                                                 applied_count += 1;
-                                                println!("✓ Marked episode as completed via GPodder sync: {} ({}s of {}s)",
-                                                        episode_url, position_sec, episode_duration);
+                                                // Only log changelog-news-168 for debugging
+                                                if episode_url.contains("changelog-news-168") {
+                                                    changelog_168_found = true;
+                                                    changelog_168_result = format!("✅ Marked as completed: {}s/{}s", position_sec, episode_duration);
+                                                    tracing::info!("✓ Marked changelog-news-168 as completed via GPodder sync");
+                                                }
                                             }
                                             Err(e) => {
-                                                tracing::warn!("Failed to mark episode {} as completed: {} - continuing with remaining episodes", episode_url, e);
+                                                if episode_url.contains("changelog-news-168") {
+                                                    changelog_168_found = true;
+                                                    changelog_168_result = format!("❌ FAILED to mark complete: {}", e);
+                                                }
+                                                tracing::debug!("Failed to mark episode as completed: {}", e);
                                             }
                                         }
                                     } else {
@@ -12727,16 +12840,16 @@ impl DatabasePool {
                                                 applied_count += 1;
                                                 if episode_url.contains("changelog-news-168") {
                                                     changelog_168_found = true;
-                                                    changelog_168_result = format!("✅ SUCCESS: Updated to {}s/{} s", position_sec, episode_duration);
+                                                    changelog_168_result = format!("✅ Updated progress: {}s/{}s", position_sec, episode_duration);
+                                                    tracing::info!("✓ Updated changelog-news-168 progress to {}s/{}s", position_sec, episode_duration);
                                                 }
-                                                println!("Updated episode progress: {} -> {}s/{}s", episode_url, position_sec, episode_duration);
                                             }
                                             Err(e) => {
                                                 if episode_url.contains("changelog-news-168") {
                                                     changelog_168_found = true;
                                                     changelog_168_result = format!("❌ FAILED: {}", e);
                                                 }
-                                                tracing::warn!("Failed to update episode {} progress: {} - continuing with remaining episodes", episode_url, e);
+                                                tracing::debug!("Failed to update episode progress: {}", e);
                                             }
                                         }
                                     }
@@ -12745,10 +12858,9 @@ impl DatabasePool {
                                     match self.update_episode_progress(user_id, episode_id, position as i32, timestamp).await {
                                         Ok(_) => {
                                             applied_count += 1;
-                                            tracing::debug!("Applied episode action (no duration): {} -> position {}", episode_url, position);
                                         }
                                         Err(e) => {
-                                            tracing::warn!("Failed to update episode {} progress (no duration): {} - continuing with remaining episodes", episode_url, e);
+                                            tracing::debug!("Failed to update episode progress (no duration): {}", e);
                                         }
                                     }
                                 }
@@ -12763,22 +12875,22 @@ impl DatabasePool {
                         }
                     }
                     "download" => {
-                        // Handle download actions if needed
-                        tracing::info!("Download action for episode: {}", episode_url);
+                        // Handle download actions if needed (currently not implemented)
+                        tracing::debug!("Download action for episode: {}", episode_url);
                     }
                     "delete" => {
-                        // Handle delete actions if needed
-                        tracing::info!("Delete action for episode: {}", episode_url);
+                        // Handle delete actions if needed (currently not implemented)
+                        tracing::debug!("Delete action for episode: {}", episode_url);
                     }
                     _ => {
-                        tracing::warn!("Unknown action type: {}", action_type);
+                        tracing::debug!("Unknown action type: {}", action_type);
                     }
                 }
             }
         }
         
-        tracing::info!("Episode actions processing complete: {} applied, {} not found in local database",
-                      applied_count, not_found_count);
+        tracing::info!("✅ Episode actions processing complete: {}/{} applied, {} not found in local database",
+                      applied_count, total_actions, not_found_count);
 
         // Print changelog-news-168 result
         println!("\n========== CHANGELOG-NEWS-168 DEBUG ==========");
@@ -17795,10 +17907,10 @@ impl DatabasePool {
         }
         
         if config.include_played {
-            play_state_conditions.push("h.listenduration >= e.episodeduration".to_string());
+            play_state_conditions.push("(e.completed = TRUE OR h.listenduration >= e.episodeduration)".to_string());
             tracing::debug!("Playlist {}: Added played/completed episode filter", playlist_id);
         }
-        
+
         if !play_state_conditions.is_empty() {
             select_query.push_str(&format!(" AND ({})", play_state_conditions.join(" OR ")));
             tracing::debug!("Playlist {}: Applied play state filter: ({})", playlist_id, play_state_conditions.join(" OR "));
@@ -17806,6 +17918,12 @@ impl DatabasePool {
             // If no play states are selected, exclude all episodes (return no results)
             select_query.push_str(" AND FALSE");
             tracing::debug!("Playlist {}: No play states selected - excluding all episodes", playlist_id);
+        }
+
+        // Explicitly exclude completed episodes when include_played is false
+        if !config.include_played {
+            select_query.push_str(" AND e.completed = FALSE");
+            tracing::debug!("Playlist {}: Excluding all completed episodes (include_played=false)", playlist_id);
         }
         
         // Note: No ORDER BY in inner query - final sorting is handled by ROW_NUMBER() OVER clause
@@ -17927,14 +18045,19 @@ impl DatabasePool {
         }
         
         if config.include_played {
-            play_state_conditions.push("h.ListenDuration >= e.EpisodeDuration".to_string());
+            play_state_conditions.push("(e.Completed = TRUE OR h.ListenDuration >= e.EpisodeDuration)".to_string());
         }
-        
+
         if !play_state_conditions.is_empty() {
             select_query.push_str(&format!(" AND ({})", play_state_conditions.join(" OR ")));
         } else {
             // If no play states are selected, exclude all episodes (return no results)
             select_query.push_str(" AND FALSE");
+        }
+
+        // Explicitly exclude completed episodes when include_played is false
+        if !config.include_played {
+            select_query.push_str(" AND e.Completed = FALSE");
         }
         
         // Note: No ORDER BY in inner query - final sorting is handled by ROW_NUMBER() OVER clause

@@ -280,9 +280,9 @@ func getEpisodeActions(database *db.Database) gin.HandlerFunc {
 				}
 			}
 
-			// ORDER BY ASC (oldest first) for proper pagination with since parameter
-			// This ensures that when client uses since={last_timestamp}, they get the next batch chronologically
-			queryParts = append(queryParts, "ORDER BY e.Timestamp ASC")
+			// ORDER BY DESC (newest first) to prioritize recent actions
+			// This ensures recent play state is synced first, even if total actions > limit
+			queryParts = append(queryParts, "ORDER BY e.Timestamp DESC")
 
 			// Add LIMIT for performance - prevents returning massive datasets
 			// Clients should use the 'since' parameter to paginate through results
