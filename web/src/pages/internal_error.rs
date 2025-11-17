@@ -25,6 +25,18 @@ pub fn internal_error() -> Html {
                     {"There's supposed to be a clever quip here, but you probably broke that, too."}
                 </p>
 
+                {
+                    if !props.message.is_empty() {
+                        html! {
+                            { props.message.clone() }
+
+                        }
+
+                    } else {
+                        html! { }
+                    }
+                }
+
                 <button
                     onclick={on_home_click}
                     class="flex items-center gap-2 px-6 py-3 mt-4 rounded-lg transition-all
