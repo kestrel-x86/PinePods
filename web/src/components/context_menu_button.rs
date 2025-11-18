@@ -400,13 +400,12 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
     let download_api_key = api_key.clone();
     let download_server_name = server_name.clone();
     let download_post = post_dispatch.clone();
-    let on_download_episode = {
+    let on_server_download_episode = {
         let episode = props.episode.clone();
         Callback::from(move |_| {
             let post_state = download_post.clone();
             let server_name_copy = download_server_name.clone();
             let api_key_copy = download_api_key.clone();
-            let episode_clone = episode.clone();
             let request = DownloadEpisodeRequest {
                 episode_id: episode.episodeid,
                 user_id: user_id.unwrap(), // replace with the actual user ID
@@ -414,6 +413,7 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
             };
             let server_name = server_name_copy; // replace with the actual server name
             let api_key = api_key_copy; // replace with the actual API key
+            let episode = episode.clone();
             let future = async move {
                 // let _ = call_download_episode(&server_name.unwrap(), &api_key.flatten(), &request).await;
                 // post_state.reduce_mut(|state| state.info_message = Option::from(format!("Episode now downloading!")));
@@ -423,10 +423,7 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
                     Ok(success_message) => {
                         post_state.reduce_mut(|state| {
                             state.info_message = Option::from(format!("{}", success_message));
-                            if let Some(ref mut downloaded_episodes) = state.downloaded_episode_ids
-                            {
-                                downloaded_episodes.push(episode_clone.episodeid);
-                            }
+                            state.downloaded_episodes.push_server(episode);
                         });
                     }
                     Err(e) => {
@@ -473,20 +470,8 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
                     Ok(success_message) => {
                         let formatted_info = format_error_message(&success_message.to_string());
 
-                        // queue_post.reduce_mut(|state| state.info_message = Option::from(format!("{}", success_message)));
                         post_dispatch.reduce_mut(|state| {
-                            // Here, you should remove the episode from the downloaded_episodes
-                            if let Some(ref mut downloaded_episodes) = state.downloaded_episodes {
-                                downloaded_episodes
-                                    .episodes
-                                    .retain(|ep| ep.episodeid != episode_id);
-                            }
-                            if let Some(ref mut downloaded_episode_ids) =
-                                state.downloaded_episode_ids
-                            {
-                                downloaded_episode_ids.retain(|&id| id != episode_id);
-                            }
-                            // Optionally, you can update the info_message with success message
+                            state.downloaded_episodes.remove_local(episode.episodeid);
                             state.info_message = Some(format!("{}", formatted_info).to_string());
                         });
                     }
@@ -505,20 +490,16 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
     };
 
     let is_downloaded = post_state
-        .downloaded_episode_ids
-        .as_ref()
-        .unwrap_or(&vec![])
-        .contains(&check_episode_id.clone());
+        .downloaded_episodes
+        .is_server_download(check_episode_id);
 
     #[cfg(not(feature = "server_build"))]
     let is_locally_downloaded = post_state
-        .locally_downloaded_episodes
-        .as_ref()
-        .unwrap_or(&vec![])
-        .contains(&check_episode_id.clone());
+        .downloaded_episodes
+        .is_local_download(check_episode_id);
 
     let on_toggle_download = {
-        let on_download = on_download_episode.clone();
+        let on_download = on_server_download_episode.clone();
         let on_remove_download = on_remove_downloaded_episode.clone();
         Callback::from(move |_| {
             if is_downloaded {
@@ -550,6 +531,7 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
             let ep_api_key = api_key_copy.clone().flatten();
             let api_key = api_key_copy.clone().flatten();
 
+            let episode = episode.clone();
             let future = async move {
                 match call_get_episode_metadata(&server_name, ep_api_key, &request).await {
                     Ok(episode_info) => {
@@ -562,14 +544,7 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
                             state.info_message = Some(format!("Episode download queued!"));
 
                             // Add to locally downloaded episodes list
-                            if let Some(ref mut local_episodes) = state.locally_downloaded_episodes
-                            {
-                                if !local_episodes.contains(&episode_id) {
-                                    local_episodes.push(episode_id);
-                                }
-                            } else {
-                                state.locally_downloaded_episodes = Some(vec![episode_id]);
-                            }
+                            state.downloaded_episodes.push_local(episode);
                         });
                         // Download audio
                         match download_file(audio_url, filename.clone()).await {
@@ -599,7 +574,7 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
                         }
 
                         // Update local JSON database
-                        if let Err(e) = update_local_database(episode_info).await {
+                        if let Err(e) = update_local_database(episode_info.clone()).await {
                             post_state.reduce_mut(|state| {
                                 let formatted_error = format_error_message(&format!("{:?}", e));
                                 state.error_message = Some(format!(
@@ -617,7 +592,7 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
                             &server_name,
                             &api_key.unwrap(),
                             user_id_copy.unwrap(),
-                            &podcast_id,
+                            podcast_id,
                         )
                         .await
                         {
@@ -683,10 +658,7 @@ pub fn context_button(props: &ContextButtonProps) -> Html {
                                 Some(format!("Local episode {} deleted!", filename));
 
                             // Remove from locally downloaded episodes list
-                            if let Some(ref mut local_episodes) = state.locally_downloaded_episodes
-                            {
-                                local_episodes.retain(|&id| id != episode_id);
-                            }
+                            state.downloaded_episodes.remove_local(episode_id);
                         });
 
                         // Update local_download_increment in ui_state

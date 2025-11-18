@@ -2,8 +2,14 @@ use gloo::history::BrowserHistory;
 use yew::prelude::*;
 use yew_router::history::History;
 
+#[derive(Properties, PartialEq)]
+pub struct InternalErrorProps {
+    #[prop_or_default]
+    pub message: String,
+}
+
 #[function_component(InternalError)]
-pub fn internal_error() -> Html {
+pub fn internal_error(props: &InternalErrorProps) -> Html {
     let on_home_click = Callback::from(|e: MouseEvent| {
         e.prevent_default();
         let history = BrowserHistory::new();

@@ -268,18 +268,13 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
         let check_episode_id = props.episode.episodeid;
         #[cfg(feature = "server_build")]
         let is_local = state
-            .downloaded_episode_ids
-            .as_ref()
-            .unwrap_or(&vec![])
-            .contains(&check_episode_id.clone());
+            .downloaded_episodes
+            .is_local_download(check_episode_id);
 
         #[cfg(not(feature = "server_build"))]
         let is_local = state
-            .locally_downloaded_episodes
-            .as_ref()
-            .unwrap_or(&vec![])
-            .contains(&check_episode_id.clone());
-
+            .downloaded_episodes
+            .is_local_download(check_episode_id);
         let src = if props.episode.episodeurl.contains("youtube.com") {
             format!(
                 "{}/api/data/stream/{}?api_key={}&user_id={}&type=youtube",

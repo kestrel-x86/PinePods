@@ -144,10 +144,9 @@ pub fn home() -> Html {
                                     .map(|ep| ep.episodeid)
                                     .collect();
 
-                                let downloaded_episode_ids: Vec<i32> = all_episodes
-                                    .clone()
+                                let downloaded_episodes: Vec<Episode> = all_episodes
                                     .filter(|ep| ep.downloaded)
-                                    .map(|ep| ep.episodeid)
+                                    .map(|ep| ep.clone())
                                     .collect();
 
                                 effect_dispatch.reduce_mut(move |state| {
@@ -157,7 +156,10 @@ pub fn home() -> Html {
                                     state.completed_episodes = Some(completed_episode_ids);
                                     state.saved_episodes = saved_episodes;
                                     state.queued_episode_ids = Some(queued_episode_ids);
-                                    state.downloaded_episode_ids = Some(downloaded_episode_ids);
+                                    state.downloaded_episodes.clear_server();
+                                    for ep in downloaded_episodes {
+                                        state.downloaded_episodes.push_server(ep);
+                                    }
                                 });
                                 loading.set(false);
                             }

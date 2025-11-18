@@ -107,9 +107,9 @@ pub struct AppState {
     #[serde(default)]
     pub saved_episodes: Vec<Episode>,
     pub episode_history: Option<HistoryDataResponse>,
-    pub downloaded_episodes: Option<EpisodeDownloadResponse>,
+    #[serde(default)]
+    pub downloaded_episodes: DownloadedEpisodeRecords,
     pub search_episodes: Option<SearchResponse>,
-    pub episodes: Option<Episode>,
     pub clicked_podcast_info: Option<ClickedFeedURL>,
     pub pods: Option<Podcast>,
     pub podcast_feed_return: Option<PodcastResponse>,
@@ -142,8 +142,6 @@ pub struct AppState {
     pub podcast_added: Option<bool>,
     pub completed_episodes: Option<Vec<i32>>,
     pub queued_episode_ids: Option<Vec<i32>>,
-    pub downloaded_episode_ids: Option<Vec<i32>>,
-    pub locally_downloaded_episodes: Option<Vec<i32>>,
     pub podcast_layout: Option<PodcastLayout>,
     pub refresh_progress: Option<RefreshProgress>,
     pub youtube_search_results: Option<YouTubeSearchResults>,
@@ -161,6 +159,118 @@ pub struct AppState {
 impl AppState {
     pub fn saved_episode_ids(&self) -> impl Iterator<Item = i32> + '_ {
         self.saved_episodes.iter().map(|e| e.episodeid)
+    }
+}
+
+/// A collection of records for episodes downloaded either locally or on the server.
+/// Mutating this collection does not affect the filesystem and episodes will need
+/// to be downloaded or deleted to match changes made here.
+#[derive(Default, Deserialize, Clone, PartialEq, Debug)]
+pub struct DownloadedEpisodeRecords {
+    episodes: Vec<Episode>,
+    local_ids: HashSet<i32>,
+    server_ids: HashSet<i32>,
+}
+
+#[allow(dead_code)]
+impl DownloadedEpisodeRecords {
+    /// Creates an iterator of all downloaded &Episode
+    pub fn episodes(&self) -> impl Iterator<Item = &Episode> + '_ {
+        self.episodes.iter()
+    }
+
+    /// Creates an unordered iterator over ids for episodes downloaded locally
+    pub fn local_ids(&self) -> impl Iterator<Item = i32> + '_ {
+        self.local_ids.iter().map(|id| id.clone())
+    }
+
+    /// Creates an unordered iterator over ids for episodes downloaded to the server
+    pub fn server_ids(&self) -> impl Iterator<Item = i32> + '_ {
+        self.server_ids.iter().map(|id| id.clone())
+    }
+
+    /// Checks if episode is downloaded to the server
+    pub fn is_server_download(&self, id: i32) -> bool {
+        self.server_ids.contains(&id)
+    }
+
+    /// Checks if episode is downloaded to the server
+    pub fn is_local_download(&self, id: i32) -> bool {
+        self.local_ids.contains(&id)
+    }
+
+    /// Add a record of an Episode downloaded locally
+    pub fn push_local(&mut self, episode: Episode) {
+        let id = episode.episodeid;
+        // only add Episode if the id doesn't exist in either set
+        if !self.server_ids.contains(&episode.episodeid)
+            && !self.local_ids.contains(&episode.episodeid)
+        {
+            self.episodes.push(episode);
+        }
+
+        self.local_ids.insert(id);
+    }
+
+    /// Add a record of an Episode downloaded to the server
+    pub fn push_server(&mut self, episode: Episode) {
+        let id = episode.episodeid;
+        // only add Episode if the id doesn't exist in either set
+        if !self.server_ids.contains(&episode.episodeid)
+            && !self.local_ids.contains(&episode.episodeid)
+        {
+            self.episodes.push(episode);
+        }
+
+        self.server_ids.insert(id);
+    }
+
+    /// Remove the record of an Episode downloaded locally
+    pub fn remove_local(&mut self, id: i32) {
+        self.local_ids.remove(&id);
+
+        // remove the ep if it isn't also downloaded on the server
+        if !self.server_ids.contains(&id) {
+            self.episodes.retain(|ep| ep.episodeid != id);
+        }
+    }
+
+    /// Remove the record of an Episode downloaded on the server
+    pub fn remove_server(&mut self, id: i32) {
+        self.server_ids.remove(&id);
+
+        // remove the ep if it isn't also downloaded locally
+        if !self.local_ids.contains(&id) {
+            self.episodes.retain(|ep| ep.episodeid != id);
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.episodes.clear();
+        self.server_ids.clear();
+        self.local_ids.clear();
+    }
+
+    /// Remove all records of episodes downloaded locally
+    pub fn clear_local(&mut self) {
+        for id in self.local_ids.drain() {
+            if !self.server_ids.contains(&id) {
+                self.episodes.retain(|ep| ep.episodeid != id);
+            }
+        }
+    }
+
+    /// Remove all records of episodes downloaded on the server
+    pub fn clear_server(&mut self) {
+        for id in self.local_ids.drain() {
+            if !self.server_ids.contains(&id) {
+                self.episodes.retain(|ep| ep.episodeid != id);
+            }
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.episodes.len()
     }
 }
 

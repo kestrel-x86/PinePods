@@ -3,6 +3,7 @@ pub(crate) mod app_drawer;
 pub(crate) mod context_menu_button;
 pub(crate) mod episode_list_item;
 pub(crate) mod host_component;
+pub(crate) mod loading;
 pub mod misc_func;
 pub(crate) mod navigation;
 pub(crate) mod notification_center;

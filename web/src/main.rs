@@ -13,6 +13,7 @@ use crate::pages::episode_layout::EpisodeLayout;
 use crate::pages::feed::Feed;
 use crate::pages::history::PodHistory;
 use crate::pages::home::Home;
+use crate::pages::internal_error::InternalError;
 use crate::pages::not_found::NotFound;
 use crate::pages::person::Person;
 use crate::pages::playlist_detail::PlaylistDetail;

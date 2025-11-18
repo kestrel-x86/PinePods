@@ -125,16 +125,17 @@ pub fn downloads() -> Html {
                         }
 
                         match call_get_episode_downloads(&server_name, &api_key, &user_id).await {
-                            Ok(fetched_episodes) => {
+                            Ok(mut fetched_episodes) => {
                                 let completed_episode_ids: Vec<i32> = fetched_episodes
                                     .iter()
                                     .filter(|ep| ep.completed)
                                     .map(|ep| ep.episodeid)
                                     .collect();
                                 dispatch.reduce_mut(move |state| {
-                                    state.downloaded_episodes = Some(EpisodeDownloadResponse {
-                                        episodes: fetched_episodes,
-                                    });
+                                    state.downloaded_episodes.clear();
+                                    for ep in fetched_episodes.drain(..) {
+                                        state.downloaded_episodes.push_server(ep);
+                                    }
                                     state.completed_episodes = Some(completed_episode_ids);
                                 });
 
@@ -143,17 +144,14 @@ pub fn downloads() -> Html {
                                 {
                                     let dispatch_local = dispatch.clone();
                                     wasm_bindgen_futures::spawn_local(async move {
-                                        if let Ok(local_episodes) =
+                                        if let Ok(mut local_episodes) =
                                             crate::pages::downloads_tauri::fetch_local_episodes()
                                                 .await
                                         {
-                                            let local_episode_ids: Vec<i32> = local_episodes
-                                                .iter()
-                                                .map(|ep| ep.episodeid)
-                                                .collect();
                                             dispatch_local.reduce_mut(move |state| {
-                                                state.locally_downloaded_episodes =
-                                                    Some(local_episode_ids);
+                                                for ep in local_episodes.drain(..) {
+                                                    state.downloaded_episodes.push_local(ep);
+                                                }
                                             });
                                         }
                                     });
@@ -226,7 +224,7 @@ pub fn downloads() -> Html {
             let user_id_cloned = user_id.unwrap();
 
             dispatch.reduce_mut(move |state| {
-                let selected_episodes: Vec<i32> = state
+                let selected_episode_ids: Vec<i32> = state
                     .selected_episodes_for_deletion
                     .iter()
                     .cloned()
@@ -236,9 +234,9 @@ pub fn downloads() -> Html {
                 // Clear the selected episodes for deletion right away to prevent re-deletion
                 state.selected_episodes_for_deletion.clear();
 
-                if !selected_episodes.is_empty() {
+                if !selected_episode_ids.is_empty() {
                     let bulk_request = BulkEpisodeActionRequest {
-                        episode_ids: selected_episodes.clone(),
+                        episode_ids: selected_episode_ids.clone(),
                         user_id: user_id_cloned,
                         is_youtube: Some(is_youtube),
                     };
@@ -254,14 +252,10 @@ pub fn downloads() -> Html {
                         {
                             Ok(success_message) => {
                                 dispatch_for_future.reduce_mut(|state| {
-                                    // Remove deleted episodes from the state
-                                    if let Some(downloaded_episodes) =
-                                        &mut state.downloaded_episodes
-                                    {
-                                        downloaded_episodes.episodes.retain(|ep| {
-                                            !selected_episodes.contains(&ep.episodeid)
-                                        });
+                                    for id in selected_episode_ids {
+                                        state.downloaded_episodes.remove_server(id);
                                     }
+
                                     state.info_message = Some(success_message);
                                 });
                             }
@@ -430,103 +424,92 @@ pub fn downloads() -> Html {
                     }
 
                     {
-                    if let Some(download_eps) = state.downloaded_episodes.clone() {
-                        let int_download_eps = download_eps.clone();
+                        if state.downloaded_episodes.len() > 0 {
                             let render_state = post_state.clone();
                             let dispatch_cloned = dispatch.clone();
 
-                            if int_download_eps.episodes.is_empty() {
-                                // Render "No Recent Episodes Found" if episodes list is empty
-                                empty_message(
-                                    &i18n_no_downloaded_episodes_found,
-                                    &i18n_no_downloaded_episodes_description
-                                )
-                            } else {
-                                let grouped_episodes = group_episodes_by_podcast(int_download_eps.episodes);
+                            let grouped_episodes = group_episodes_by_podcast(state.downloaded_episodes.episodes().map(|e| e.clone()).collect());
 
-                                // Create filtered episodes
-                                let filtered_grouped_episodes = {
-                                    let mut filtered_map: HashMap<i32, Vec<Episode>> = HashMap::new();
+                            // Create filtered episodes
+                            let filtered_grouped_episodes = {
+                                let mut filtered_map: HashMap<i32, Vec<Episode>> = HashMap::new();
 
-                                    for (podcast_id, episodes) in grouped_episodes.iter() {
-                                        let filtered_episodes: Vec<Episode> = episodes.iter()
-                                            .filter(|episode| {
-                                                // Search filter
-                                                let matches_search = if !episode_search_term.is_empty() {
-                                                    episode.episodetitle.to_lowercase().contains(&episode_search_term.to_lowercase())
-                                                } else {
-                                                    true
-                                                };
-
-                                                // Completion filter
-                                                let matches_completion = if *show_completed && *show_in_progress {
-                                                    true // Both filters active = show all
-                                                } else if *show_completed {
-                                                    episode.completed
-                                                } else if *show_in_progress {
-                                                    !episode.completed && episode.listenduration > 0
-                                                } else {
-                                                    true // No filters = show all
-                                                };
-
-                                                matches_search && matches_completion
-                                            })
-                                            .cloned()
-                                            .collect();
-
-                                        if !filtered_episodes.is_empty() {
-                                            filtered_map.insert(*podcast_id, filtered_episodes);
-                                        }
-                                    }
-
-                                    filtered_map
-                                };
-
-                                html! {
-                                    <>
-                                        { for state.podcast_feed_return.as_ref().unwrap().pods.as_ref().unwrap().iter().filter_map(|podcast| {
-                                            let episodes = filtered_grouped_episodes.get(&podcast.podcastid).unwrap_or(&Vec::new()).clone();
-                                            if episodes.is_empty() {
-                                                None
+                                for (podcast_id, episodes) in grouped_episodes.iter() {
+                                    let filtered_episodes: Vec<Episode> = episodes.iter()
+                                        .filter(|episode| {
+                                            // Search filter
+                                            let matches_search = if !episode_search_term.is_empty() {
+                                                episode.episodetitle.to_lowercase().contains(&episode_search_term.to_lowercase())
                                             } else {
-                                                let downloaded_episode_count = episodes.len();
-                                                let is_expanded = *expanded_state.get(&podcast.podcastid).unwrap_or(&false);
-                                                let toggle_expanded_closure = {
-                                                    let podcast_id = podcast.podcastid;
-                                                    toggle_pod_expanded.reform(move |_| podcast_id)
-                                                };
+                                                true
+                                            };
 
-                                                let render_state_cloned = render_state.clone();
-                                                let dispatch_cloned_cloned = dispatch_cloned.clone();
-                                                let audio_state_cloned = audio_state.clone();
-                                                let audio_dispatch_cloned = audio_dispatch.clone();
-                                                let on_checkbox_change_cloned = on_checkbox_change.clone();
+                                            // Completion filter
+                                            let matches_completion = if *show_completed && *show_in_progress {
+                                                true // Both filters active = show all
+                                            } else if *show_completed {
+                                                episode.completed
+                                            } else if *show_in_progress {
+                                                !episode.completed && episode.listenduration > 0
+                                            } else {
+                                                true // No filters = show all
+                                            };
 
-                                                Some(render_podcast_with_episodes(
-                                                    podcast,
-                                                    episodes,
-                                                    downloaded_episode_count,
-                                                    is_expanded,
-                                                    toggle_expanded_closure,
-                                                    render_state_cloned,
-                                                    dispatch_cloned_cloned,
-                                                    is_delete_mode,
-                                                    audio_state_cloned,
-                                                    desc_state.clone(),
-                                                    desc_dispatch.clone(),
-                                                    audio_dispatch_cloned,
-                                                    on_checkbox_change_cloned,
-                                                    *show_modal,
-                                                    on_modal_open.clone(),
-                                                    on_modal_close.clone(),
-                                                ))
-                                            }
-                                        }) }
-                                    </>
+                                            matches_search && matches_completion
+                                        })
+                                        .cloned()
+                                        .collect();
+
+                                    if !filtered_episodes.is_empty() {
+                                        filtered_map.insert(*podcast_id, filtered_episodes);
+                                    }
                                 }
 
-                            }
+                                filtered_map
+                            };
 
+                            html! {
+                                <>
+                                    { for state.podcast_feed_return.as_ref().unwrap().pods.as_ref().unwrap().iter().filter_map(|podcast| {
+                                        let episodes = filtered_grouped_episodes.get(&podcast.podcastid).unwrap_or(&Vec::new()).clone();
+                                        if episodes.is_empty() {
+                                            None
+                                        } else {
+                                            let downloaded_episode_count = episodes.len();
+                                            let is_expanded = *expanded_state.get(&podcast.podcastid).unwrap_or(&false);
+                                            let toggle_expanded_closure = {
+                                                let podcast_id = podcast.podcastid;
+                                                toggle_pod_expanded.reform(move |_| podcast_id)
+                                            };
+
+                                            let render_state_cloned = render_state.clone();
+                                            let dispatch_cloned_cloned = dispatch_cloned.clone();
+                                            let audio_state_cloned = audio_state.clone();
+                                            let audio_dispatch_cloned = audio_dispatch.clone();
+                                            let on_checkbox_change_cloned = on_checkbox_change.clone();
+
+                                            Some(render_podcast_with_episodes(
+                                                podcast,
+                                                episodes,
+                                                downloaded_episode_count,
+                                                is_expanded,
+                                                toggle_expanded_closure,
+                                                render_state_cloned,
+                                                dispatch_cloned_cloned,
+                                                is_delete_mode,
+                                                audio_state_cloned,
+                                                desc_state.clone(),
+                                                desc_dispatch.clone(),
+                                                audio_dispatch_cloned,
+                                                on_checkbox_change_cloned,
+                                                *show_modal,
+                                                on_modal_open.clone(),
+                                                on_modal_close.clone(),
+                                            ))
+                                        }
+                                    }) }
+                                </>
+                            }
 
                         } else {
                             empty_message(
@@ -535,7 +518,8 @@ pub fn downloads() -> Html {
                             )
                         }
                     }
-            }
+
+                }
         {
             if let Some(audio_props) = &audio_state.currently_playing {
                 html! { <AudioPlayer src={audio_props.src.clone()} title={audio_props.title.clone()} description={audio_props.description.clone()} release_date={audio_props.release_date.clone()} artwork_url={audio_props.artwork_url.clone()} duration={audio_props.duration.clone()} episode_id={audio_props.episode_id.clone()} duration_sec={audio_props.duration_sec.clone()} start_pos_sec={audio_props.start_pos_sec.clone()} end_pos_sec={audio_props.end_pos_sec.clone()} offline={audio_props.offline.clone()} is_youtube={audio_props.is_youtube.clone()} /> }

@@ -1784,7 +1784,7 @@ pub async fn call_get_podcast_id_from_ep_name(
     Ok(response_data.podcast_id)
 }
 
-#[derive(Deserialize, Debug, Clone, Serialize)]
+#[derive(Deserialize, Debug, Clone, Serialize, PartialEq)]
 pub struct PodcastDetails {
     pub podcastid: i32,
     pub podcastname: String,

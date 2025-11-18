@@ -121,17 +121,15 @@ pub fn saved() -> Html {
                                 {
                                     let dispatch_local = dispatch.clone();
                                     wasm_bindgen_futures::spawn_local(async move {
-                                        if let Ok(local_episodes) =
+                                        if let Ok(mut local_episodes) =
                                             crate::pages::downloads_tauri::fetch_local_episodes()
                                                 .await
                                         {
-                                            let local_episode_ids: Vec<i32> = local_episodes
-                                                .iter()
-                                                .map(|ep| ep.episodeid)
-                                                .collect();
                                             dispatch_local.reduce_mut(move |state| {
-                                                state.locally_downloaded_episodes =
-                                                    Some(local_episode_ids);
+                                                state.downloaded_episodes.clear_local();
+                                                for ep in local_episodes.drain(..) {
+                                                    state.downloaded_episodes.push_local(ep);
+                                                }
                                             });
                                         }
                                     });

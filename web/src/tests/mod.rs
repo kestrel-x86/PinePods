@@ -1,6 +1,6 @@
 // src/tests/mod.rs
 use crate::components::context::AppState;
-use crate::components::routes::Route;
+use crate::pages::routes::Route;
 use crate::switch;
 
 #[test]

@@ -170,10 +170,10 @@ pub fn navigation_handler(props: &NavigationHandlerProps) -> Html {
                                                                 // Check for unmatched podcasts and show notification
                                                                 let dispatch_unmatched = dispatch_clone.clone();
                                                                 if let Ok(unmatched_response) = call_get_unmatched_podcasts(
-                                                                    server_name,
-                                                                    api_key,
-                                                                    user_id,
-                                                                ).await {
+                                                                        server_name,
+                                                                        api_key,
+                                                                        user_id,
+                                                                    ).await {
                                                                     if !unmatched_response.podcasts.is_empty() {
                                                                         dispatch_unmatched.reduce_mut(|state| {
                                                                             state.info_message = Some(
