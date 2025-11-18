@@ -224,63 +224,47 @@ pub fn search_bar() -> Html {
 
             wasm_bindgen_futures::spawn_local(async move {
                 dispatch.reduce_mut(|state| state.is_loading = Some(true));
+                if *search_index == "youtube" {
+                    match call_youtube_search(&search_value, &api_url.unwrap()).await {
+                        Ok(yt_results) => {
+                            let search_results = YouTubeSearchResults {
+                                channels: yt_results.results,
+                                videos: Vec::new(),
+                            };
 
-                match test_connection(&api_url.clone().unwrap()).await {
-                    Ok(_) => {
-                        if *search_index == "youtube" {
-                            match call_youtube_search(&search_value, &api_url.unwrap()).await {
-                                Ok(yt_results) => {
-                                    let search_results = YouTubeSearchResults {
-                                        channels: yt_results.results,
-                                        videos: Vec::new(),
-                                    };
+                            dispatch.reduce_mut(|state| {
+                                state.youtube_search_results = Some(search_results);
+                                state.is_loading = Some(false);
+                            });
 
-                                    dispatch.reduce_mut(|state| {
-                                        state.youtube_search_results = Some(search_results);
-                                        state.is_loading = Some(false);
-                                    });
-
-                                    history.push("/youtube_layout");
-                                }
-                                Err(e) => {
-                                    let formatted_error = format_error_message(&e.to_string());
-                                    dispatch.reduce_mut(|state| {
-                                        state.error_message = Some(format!(
-                                            "YouTube search error: {}",
-                                            formatted_error
-                                        ));
-                                        state.is_loading = Some(false);
-                                    });
-                                }
-                            }
-                        } else {
-                            match call_get_podcast_info(
-                                &search_value,
-                                &api_url.unwrap(),
-                                &search_index,
-                            )
-                            .await
-                            {
-                                Ok(search_results) => {
-                                    dispatch.reduce_mut(move |state| {
-                                        state.search_results = Some(search_results);
-                                        state.podcast_added = Some(false);
-                                    });
-                                    dispatch.reduce_mut(|state| state.is_loading = Some(false));
-                                    history.push("/pod_layout");
-                                }
-                                Err(_) => {
-                                    dispatch.reduce_mut(|state| state.is_loading = Some(false));
-                                }
-                            }
+                            history.push("/youtube_layout");
+                        }
+                        Err(e) => {
+                            let formatted_error = format_error_message(&e.to_string());
+                            dispatch.reduce_mut(|state| {
+                                state.error_message =
+                                    Some(format!("YouTube search error: {}", formatted_error));
+                                state.is_loading = Some(false);
+                            });
                         }
                     }
-                    Err(e) => {
-                        web_sys::console::log_1(&format!("Error testing connection: {}", e).into());
-                        dispatch.reduce_mut(|state| state.is_loading = Some(false));
+                } else {
+                    match call_get_podcast_info(&search_value, &api_url.unwrap(), &search_index)
+                        .await
+                    {
+                        Ok(search_results) => {
+                            dispatch.reduce_mut(move |state| {
+                                state.search_results = Some(search_results);
+                                state.podcast_added = Some(false);
+                            });
+                            dispatch.reduce_mut(|state| state.is_loading = Some(false));
+                            history.push("/pod_layout");
+                        }
+                        Err(_) => {
+                            dispatch.reduce_mut(|state| state.is_loading = Some(false));
+                        }
                     }
                 }
-
                 // Reset submission state after completion
                 is_submitting_clone.set(false);
             });
