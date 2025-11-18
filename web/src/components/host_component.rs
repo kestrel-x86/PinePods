@@ -372,7 +372,7 @@ pub fn host_dropdown(
                                                             .as_ref()
                                                             .unwrap()
                                                             .UserID,
-                                                        &podcast_id,
+                                                        podcast_id,
                                                     )
                                                     .await
                                                 {

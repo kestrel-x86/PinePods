@@ -662,6 +662,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                                             server_name_iter,
                                             api_key_iter,
                                             &history,
+                                            podcast.podcastid,
                                             podcast.podcastindexid.clone(),
                                             podcast.podcastname.clone(),
                                             podcast.feedurl.clone(),

@@ -1814,7 +1814,7 @@ pub async fn call_get_podcast_details(
     server_name: &str,
     api_key: &str,
     user_id: i32,
-    podcast_id: &i32,
+    podcast_id: i32,
 ) -> Result<PodcastDetails, Error> {
     let url = format!(
         "{}/api/data/get_podcast_details?user_id={}&podcast_id={}",

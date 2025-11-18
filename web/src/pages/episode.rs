@@ -1636,7 +1636,7 @@ pub fn epsiode() -> Html {
                                             &server_name.clone().unwrap(),
                                             &api_key.clone().unwrap().unwrap(),
                                             user_id.unwrap(),
-                                            &podcast_id
+                                            podcast_id
                                         ).await
                                     } else {
                                         let is_added = call_check_podcast(
@@ -1669,6 +1669,7 @@ pub fn epsiode() -> Html {
                                                 server_name.unwrap(),
                                                 api_key,
                                                 &history,
+                                                details.podcastid,
                                                 details.podcastindexid,
                                                 details.podcastname,
                                                 details.feedurl,

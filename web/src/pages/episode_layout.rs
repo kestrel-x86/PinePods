@@ -795,6 +795,7 @@ pub fn episode_layout() -> Html {
                                     server_name,
                                     Some(Some(api_key.clone().unwrap())),
                                     &click_history,
+                                    podcast_details.details.podcastid,
                                     podcast_details.details.podcastindexid,
                                     podcast_details.details.podcastname,
                                     podcast_details.details.feedurl,

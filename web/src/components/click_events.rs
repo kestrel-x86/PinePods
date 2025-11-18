@@ -15,6 +15,7 @@ pub fn create_on_title_click(
     server_name: String,
     api_key: Option<Option<String>>,
     history: &BrowserHistory,
+    podcast_id: i32,
     podcast_index_id: i32,
     podcast_title: String,
     podcast_url: String,
@@ -51,7 +52,7 @@ pub fn create_on_title_click(
             });
 
         let podcast_values = ClickedFeedURL {
-            podcastid: 0,
+            podcastid: podcast_id,
             podcastname: podcast_title.clone(),
             feedurl: podcast_url.clone(),
             description: podcast_description.clone(),
