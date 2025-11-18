@@ -76,7 +76,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
     let i18n_podcast_added = i18n.t("person.podcast_successfully_added").to_string();
     let i18n_error_adding_podcast = i18n.t("person.error_adding_podcast").to_string();
 
-    let (state, dispatch) = use_store::<AppState>();
+    let (app_state, dispatch) = use_store::<AppState>();
     let (desc_state, desc_dispatch) = use_store::<ExpandedDescriptions>();
     let person_ids = use_state(|| HashMap::<String, i32>::new());
     let (post_state, _post_dispatch) = use_store::<AppState>();
@@ -124,7 +124,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
     }
     // Initialize the state for all podcasts
     let added_podcasts_state = use_state(|| {
-        state
+        app_state
             .podcast_feed_return
             .as_ref()
             .map_or(HashSet::new(), |feed| {
@@ -205,7 +205,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
         let user_id = user_id.clone();
         let server_name = server_name.clone();
         let dispatch = dispatch.clone();
-        let state_callback = state.clone();
+        let state_callback = app_state.clone();
 
         Callback::from(move |podcast_id: i32| {
             dispatch.reduce_mut(|state| state.is_loading = Some(true));
@@ -620,7 +620,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                     )}>
                         {
 
-                            if let Some(podcasts) = state.podcast_feed_return.clone() {
+                            if let Some(podcasts) = app_state.podcast_feed_return.clone() {
                                 let int_podcasts = podcasts.clone();
                                 if let Some(pods) = int_podcasts.pods.clone() {
                                     if pods.is_empty() {
@@ -803,7 +803,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                         if *episodes_expanded { "max-h-full opacity-100" } else { "max-h-0 opacity-0" }
                     )}>
                         {
-                        if let Some(results) = &state.people_feed_results {
+                        if let Some(results) = &app_state.people_feed_results {
                             html! {
                                 <div>
                                     { for results.items.iter().map(|episode| {
@@ -886,7 +886,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                                             server_name_play.unwrap(),
                                             dispatch.clone(),
                                             audio_state.clone(),
-                                            false,
+                                            app_state.clone(),
                                         );
 
                                         let description_class = if is_expanded {

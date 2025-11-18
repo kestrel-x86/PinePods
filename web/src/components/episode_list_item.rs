@@ -36,7 +36,7 @@ pub struct EpisodeListItemProps {
 
 #[function_component(EpisodeListItem)]
 pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
-    let (state, app_dispatch) = use_store::<AppState>();
+    let (app_state, app_dispatch) = use_store::<AppState>();
     let (audio_state, audio_dispatch) = use_store::<UIState>();
     let (desc_state, desc_dispatch) = use_store::<ExpandedDescriptions>();
 
@@ -139,22 +139,22 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
     let is_playing = audio_state.audio_playing.unwrap_or(false);
 
     let formatted_pub_date = {
-        let date_format = match_date_format(state.date_format.as_deref());
-        let datetime = parse_date(&props.episode.episodepubdate, &state.user_tz);
-        format_datetime(&datetime, &state.hour_preference, date_format)
+        let date_format = match_date_format(app_state.date_format.as_deref());
+        let datetime = parse_date(&props.episode.episodepubdate, &app_state.user_tz);
+        format_datetime(&datetime, &app_state.hour_preference, date_format)
     };
 
-    let api_key = state
+    let api_key = app_state
         .auth_details
         .as_ref()
         .map(|ud| ud.api_key.clone().unwrap())
         .unwrap();
-    let user_id = state
+    let user_id = app_state
         .user_details
         .as_ref()
         .map(|ud| ud.UserID.clone())
         .unwrap();
-    let server_name = state
+    let server_name = app_state
         .auth_details
         .as_ref()
         .map(|ud| ud.server_name.clone())
@@ -167,7 +167,7 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
         server_name.clone(),
         audio_dispatch.clone(),
         audio_state.clone(),
-        false,
+        app_state.clone(),
     );
 
     /*
@@ -188,7 +188,7 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
 
     let episode_duration_str = format_time(props.episode.episodeduration);
 
-    let is_completed = state
+    let is_completed = app_state
         .completed_episodes
         .as_ref()
         .unwrap_or(&vec![])
@@ -267,12 +267,12 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
     let on_shownotes_click = {
         let check_episode_id = props.episode.episodeid;
         #[cfg(feature = "server_build")]
-        let is_local = state
+        let is_local = app_state
             .downloaded_episodes
             .is_local_download(check_episode_id);
 
         #[cfg(not(feature = "server_build"))]
-        let is_local = state
+        let is_local = app_state
             .downloaded_episodes
             .is_local_download(check_episode_id);
         let src = if props.episode.episodeurl.contains("youtube.com") {
@@ -358,7 +358,7 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
                         <div class="flex items-center pl-4">
                             <input
                                 type="checkbox"
-                                checked={state.selected_episodes_for_deletion.contains(&props.episode.episodeid)}
+                                checked={app_state.selected_episodes_for_deletion.contains(&props.episode.episodeid)}
                                 class="podcast-dropdown-checkbox h-5 w-5 rounded border-2 text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer appearance-none checked:bg-primary checked:border-primary"
                                 onchange={props.on_checkbox_change.reform(move |_| checkbox_ep)}
                             />

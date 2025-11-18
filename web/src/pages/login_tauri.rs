@@ -31,7 +31,7 @@ fn generate_gravatar_url(email: &Option<String>, size: usize) -> String {
 #[function_component(Login)]
 pub fn login() -> Html {
     let (i18n, _) = use_translation();
-    
+
     // Pre-capture translation strings for use in closures and async blocks
     let i18n_error_checking_status = i18n.t("login.error_checking_status").to_string();
     let i18n_error_fetching_oidc = i18n.t("login.error_fetching_oidc_providers").to_string();
@@ -39,7 +39,7 @@ pub fn login() -> Html {
     let i18n_account_created_success = i18n.t("login.account_created_successfully").to_string();
     let i18n_error_creating_account = i18n.t("login.error_creating_account").to_string();
     let i18n_error_checking_mfa = i18n.t("login.error_checking_mfa_status").to_string();
-    let i18n_error_checking_first_login = i18n.t("login.error_checking_first_login_status").to_string();
+    let i18n_error_checking_first_login = i18n        .t("login.error_checking_first_login_status")        .to_string();
     let i18n_credentials_incorrect = i18n.t("login.credentials_incorrect").to_string();
     let i18n_error_setting_up_timezone = i18n.t("login.error_setting_up_timezone").to_string();
     let i18n_first_time_welcome = i18n.t("login.first_time_welcome").to_string();
@@ -57,7 +57,7 @@ pub fn login() -> Html {
     let i18n_new_password_label = i18n.t("login.new_password_label").to_string();
     let i18n_confirm_password_label = i18n.t("login.confirm_password_label").to_string();
     let i18n_initial_setup = i18n.t("login.initial_setup").to_string();
-    let i18n_hour_format = i18n.t("login.hour_format").to_string(); 
+    let i18n_hour_format = i18n.t("login.hour_format").to_string();
     let i18n_time_zone = i18n.t("login.time_zone").to_string();
     let i18n_date_format = i18n.t("login.date_format").to_string();
     let i18n_save_preferences = i18n.t("login.save_preferences").to_string();
@@ -77,7 +77,7 @@ pub fn login() -> Html {
     let i18n_login = i18n.t("auth.login").to_string();
     let i18n_pinepods = i18n.t("common.pinepods").to_string();
     let i18n_password_reset_successfully = i18n.t("login.password_reset_successfully").to_string();
-    
+
     let history = BrowserHistory::new();
     let username = use_state(|| "".to_string());
     let password = use_state(|| "".to_string());
@@ -516,8 +516,7 @@ pub fn login() -> Html {
                     Err(_) => {
                         // console::log_1(&format!("Error logging into server: {}", server_name).into());
                         post_state.reduce_mut(|state| {
-                            state.error_message =
-                                Option::from(i18n_credentials_incorrect.clone())
+                            state.error_message = Option::from(i18n_credentials_incorrect.clone())
                         });
                         // Handle error
                     }
@@ -704,7 +703,7 @@ pub fn login() -> Html {
                 <div class="modal-container relative rounded-lg shadow">
                     <div class="flex items-center justify-between p-4 md:p-5 border-b rounded-t dark:border-gray-600">
                         <h3 class="text-xl font-semibold">
-{&i18n.t("login.time_zone_setup")}
+                            {&i18n.t("login.time_zone_setup")}
                         </h3>
                         <button onclick={on_close_modal.clone()} class="end-2.5 text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white">
                             <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
@@ -716,7 +715,7 @@ pub fn login() -> Html {
                     <div class="p-4 md:p-5">
                         <form class="space-y-4" action="#">
                             <p class="text-m font-semibold">
-{&i18n.t("login.first_time_setup_welcome")}
+                                {&i18n.t("login.first_time_setup_welcome")}
                             </p>
                             <div>
                                 <label for="hour_format" style="margin-right: 10px;">{&i18n.t("login.hour_format")}{":"}</label>
@@ -770,10 +769,14 @@ pub fn login() -> Html {
         let api_key = state.auth_details.as_ref().map(|ud| ud.api_key.clone());
         let user_id = state.user_details.as_ref().map(|ud| ud.UserID.clone());
         let history = history.clone();
+        let i18n_error_validating_mfa = i18n_error_validating_mfa.clone();
+        let i18n_error_setting_timezone_details = i18n_error_setting_timezone_details.clone();
         // let error_message_create = error_message.clone();
         let dispatch_wasm = dispatch.clone();
         Callback::from(move |e: MouseEvent| {
             let dispatch = dispatch_wasm.clone();
+            let i18n_error_validating_mfa = i18n_error_validating_mfa.clone();
+            let i18n_error_setting_timezone_details = i18n_error_setting_timezone_details.clone();
             let mfa_code = mfa_code.clone();
             let server_name = server_name.clone();
             let api_key = api_key.clone();
@@ -782,9 +785,6 @@ pub fn login() -> Html {
             let history = history.clone();
             let post_state = post_state.clone();
             // let error_message_clone = error_message_create.clone();
-            let i18n_error_validating_mfa_clone = i18n_error_validating_mfa.clone();
-            let i18n_error_setting_timezone_details_clone =
-                i18n_error_setting_timezone_details.clone();
             e.prevent_default();
 
             wasm_bindgen_futures::spawn_local(async move {
@@ -850,7 +850,8 @@ pub fn login() -> Html {
                         } else {
                             page_state.set(PageState::Default);
                             post_state.reduce_mut(|state| {
-                                state.error_message = Option::from(i18n_error_validating_mfa_clone)
+                                state.error_message =
+                                    Option::from(i18n_error_validating_mfa.clone())
                             });
                         }
                     }
@@ -860,7 +861,8 @@ pub fn login() -> Html {
                         post_state.reduce_mut(|state| {
                             state.error_message = Option::from(format!(
                                 "{}: {:?}",
-                                i18n_error_setting_timezone_details_clone, formatted_error
+                                i18n_error_setting_timezone_details.clone(),
+                                formatted_error
                             ))
                         });
                     }

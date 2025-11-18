@@ -1,9 +1,9 @@
-use crate::components::loading::Loading;
 use crate::components::app_drawer::App_drawer;
 use crate::components::context_menu_button::PageType;
 use crate::components::gen_components::{
     empty_message, on_shownotes_click, Search_nav, UseScrollToTop,
 };
+use crate::components::loading::Loading;
 
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState};
@@ -124,7 +124,10 @@ pub fn queue() -> Html {
                         match pod_req::call_get_queued_episodes(&server_name, &api_key, &user_id)
                             .await
                         {
-                            Ok(fetched_episodes) => {
+                            Ok(mut fetched_episodes) => {
+                                fetched_episodes
+                                    .sort_by_key(|ep| ep.queueposition.unwrap_or(i32::MAX));
+
                                 let completed_episode_ids: Vec<i32> = fetched_episodes
                                     .iter()
                                     .filter(|ep| ep.completed)
