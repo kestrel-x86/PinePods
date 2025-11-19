@@ -370,7 +370,7 @@ pub fn login() -> Html {
     let submit_post_state = dispatch.clone();
     let on_submit = {
         let submit_dispatch = dispatch.clone();
-        let i18n_error_checking_mfa_status_clone = i18n_error_checking_mfa_status.clone();
+        let i18n_error_checking_mfa_status = i18n_error_checking_mfa_status.clone();
         Callback::from(move |_| {
             let i18n_error_checking_first_login = i18n_error_checking_first_login.clone();
             let i18n_credentials_incorrect = i18n_credentials_incorrect.clone();
@@ -386,7 +386,7 @@ pub fn login() -> Html {
             let temp_api_key = call_api_key.clone();
             let temp_user_id = call_user_id.clone();
 
-            let i18n_error_checking_mfa_status_clone = i18n_error_checking_mfa_status_clone.clone();
+            let i18n_error_checking_mfa_status_clone = i18n_error_checking_mfa_status.clone();
             let i18n_error_checking_first_login_clone = i18n_error_checking_first_login.clone();
             wasm_bindgen_futures::spawn_local(async move {
                 // let server_name = location.href().expect("should have a href");

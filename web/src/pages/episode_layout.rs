@@ -897,7 +897,7 @@ pub fn episode_layout() -> Html {
                                             &server_name,
                                             &api_key.as_ref().unwrap(),
                                             user_id,
-                                            &merged_id,
+                                            merged_id,
                                         )
                                         .await
                                         {
@@ -2712,7 +2712,7 @@ pub fn episode_layout() -> Html {
                                                                                                         server_name,
                                                                                                         api_key.as_deref().unwrap(),
                                                                                                         *user_id,
-                                                                                                        &id,
+                                                                                                        id,
                                                                                                     ).await {
                                                                                                         details_map.insert(id, details);
                                                                                                     }
@@ -2815,7 +2815,7 @@ pub fn episode_layout() -> Html {
                                                                                     &server_name,
                                                                                     api_key.as_deref().unwrap(),
                                                                                     user_id,
-                                                                                    &merged_id,
+                                                                                    merged_id,
                                                                                 ).await {
                                                                                     details_map.insert(merged_id, details);
                                                                                 }
