@@ -478,6 +478,8 @@ pub fn downloads() -> Html {
     let delete_selected_episodes = {
         let dispatch = dispatch.clone();
         let page_state = page_state.clone();
+        let i18n_successfully_deleted_episodes = i18n_successfully_deleted_episodes.clone();
+        let i18n_failed_to_delete_episodes = i18n_failed_to_delete_episodes.clone();
 
         Callback::from(move |_: MouseEvent| {
             let dispatch_cloned = dispatch.clone();

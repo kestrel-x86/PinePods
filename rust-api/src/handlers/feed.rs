@@ -81,6 +81,14 @@ pub struct RssKeyInfo {
 }
 
 fn extract_domain_from_request(request: &Request<axum::body::Body>) -> String {
+    // Check SERVER_URL environment variable first (includes scheme and port)
+    // Note: We use SERVER_URL instead of HOSTNAME because Docker automatically sets HOSTNAME to the container ID
+    // The startup script saves the user's HOSTNAME value to SERVER_URL before Docker overwrites it
+    if let Ok(server_url) = std::env::var("SERVER_URL") {
+        tracing::info!("Using SERVER_URL env var: {}", server_url);
+        return server_url;
+    }
+
     // Try to get domain from Host header
     if let Some(host) = request.headers().get("host") {
         if let Ok(host_str) = host.to_str() {
@@ -89,11 +97,14 @@ fn extract_domain_from_request(request: &Request<axum::body::Body>) -> String {
                 .get("x-forwarded-proto")
                 .and_then(|h| h.to_str().ok())
                 .unwrap_or("http");
-            
-            return format!("{}://{}", scheme, host_str);
+
+            let domain = format!("{}://{}", scheme, host_str);
+            tracing::info!("Using Host header: {}", domain);
+            return domain;
         }
     }
-    
+
     // Fallback
+    tracing::info!("Using fallback domain");
     "http://localhost:8041".to_string()
 }

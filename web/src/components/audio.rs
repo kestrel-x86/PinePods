@@ -800,6 +800,10 @@ pub fn audio_player(props: &AudioPlayerProps) -> Html {
                 let processing_ended = Rc::new(Cell::new(false));
                 let processing_ended_clone = processing_ended.clone();
 
+                // Flag to prevent processing the same ended event multiple times
+                let processing_ended = Rc::new(Cell::new(false));
+                let processing_ended_clone = processing_ended.clone();
+
                 let ended_closure = Closure::wrap(Box::new(move || {
                     web_sys::console::log_1(&"Episode ended event fired".into());
 
@@ -831,6 +835,7 @@ pub fn audio_player(props: &AudioPlayerProps) -> Html {
                         processing_flag_for_reset.set(false);
                     } else {
                         wasm_bindgen_futures::spawn_local(async move {
+                            web_sys::console::log_1(&"Fetching queued episodes...".into());
                             web_sys::console::log_1(&"Fetching queued episodes...".into());
                             let queued_episodes_result = call_get_queued_episodes(
                                 &server_name.clone().unwrap(),

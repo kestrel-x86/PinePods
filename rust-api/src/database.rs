@@ -1809,9 +1809,9 @@ impl DatabasePool {
                     .bind(podcast_id)
                     .fetch_optional(pool)
                     .await?;
-                
+
                 if let Some(row) = row {
-                    if let Some(merged_json) = row.try_get::<Option<String>, _>("mergedpodcastids")? {
+                    if let Some(merged_json) = row.try_get::<Option<String>, _>("MergedPodcastIDs")? {
                         let merged_ids: Vec<i32> = serde_json::from_str(&merged_json).unwrap_or_default();
                         Ok(merged_ids)
                     } else {
@@ -14391,77 +14391,145 @@ impl DatabasePool {
     }
 
     // Update OIDC provider - updates an existing provider with new values
-    pub async fn update_oidc_provider(&self, provider_id: i32, provider_name: &str, client_id: &str, client_secret: &str, authorization_url: &str, token_url: &str, user_info_url: &str, button_text: &str, scope: &str, button_color: &str, button_text_color: &str, icon_svg: &str, name_claim: &str, email_claim: &str, username_claim: &str, roles_claim: &str, user_role: &str, admin_role: &str) -> AppResult<bool> {
+    // If client_secret is None, the existing secret will be preserved
+    pub async fn update_oidc_provider(&self, provider_id: i32, provider_name: &str, client_id: &str, client_secret: Option<&str>, authorization_url: &str, token_url: &str, user_info_url: &str, button_text: &str, scope: &str, button_color: &str, button_text_color: &str, icon_svg: &str, name_claim: &str, email_claim: &str, username_claim: &str, roles_claim: &str, user_role: &str, admin_role: &str) -> AppResult<bool> {
         println!("Updating OIDC provider with ID: {}", provider_id);
-        
+
         let rows_affected = match self {
             DatabasePool::Postgres(pool) => {
-                let result = sqlx::query(r#"
-                    UPDATE "OIDCProviders" SET
-                        providername = $2, clientid = $3, clientsecret = $4, 
-                        authorizationurl = $5, tokenurl = $6, userinfourl = $7,
-                        buttontext = $8, scope = $9, buttoncolor = $10,
-                        buttontextcolor = $11, iconsvg = $12, nameclaim = $13,
-                        emailclaim = $14, usernameclaim = $15, rolesclaim = $16,
-                        userrole = $17, adminrole = $18, modified = CURRENT_TIMESTAMP
-                    WHERE providerid = $1
-                "#)
-                    .bind(provider_id)
-                    .bind(provider_name)
-                    .bind(client_id)
-                    .bind(client_secret)
-                    .bind(authorization_url)
-                    .bind(token_url)
-                    .bind(user_info_url)
-                    .bind(button_text)
-                    .bind(scope)
-                    .bind(button_color)
-                    .bind(button_text_color)
-                    .bind(icon_svg)
-                    .bind(name_claim)
-                    .bind(email_claim)
-                    .bind(username_claim)
-                    .bind(roles_claim)
-                    .bind(user_role)
-                    .bind(admin_role)
-                    .execute(pool)
-                    .await?;
-                
-                result.rows_affected()
+                // Build query dynamically based on whether client_secret is provided
+                if let Some(secret) = client_secret {
+                    let result = sqlx::query(r#"
+                        UPDATE "OIDCProviders" SET
+                            providername = $2, clientid = $3, clientsecret = $4,
+                            authorizationurl = $5, tokenurl = $6, userinfourl = $7,
+                            buttontext = $8, scope = $9, buttoncolor = $10,
+                            buttontextcolor = $11, iconsvg = $12, nameclaim = $13,
+                            emailclaim = $14, usernameclaim = $15, rolesclaim = $16,
+                            userrole = $17, adminrole = $18, modified = CURRENT_TIMESTAMP
+                        WHERE providerid = $1
+                    "#)
+                        .bind(provider_id)
+                        .bind(provider_name)
+                        .bind(client_id)
+                        .bind(secret)
+                        .bind(authorization_url)
+                        .bind(token_url)
+                        .bind(user_info_url)
+                        .bind(button_text)
+                        .bind(scope)
+                        .bind(button_color)
+                        .bind(button_text_color)
+                        .bind(icon_svg)
+                        .bind(name_claim)
+                        .bind(email_claim)
+                        .bind(username_claim)
+                        .bind(roles_claim)
+                        .bind(user_role)
+                        .bind(admin_role)
+                        .execute(pool)
+                        .await?;
+                    result.rows_affected()
+                } else {
+                    // Don't update client_secret if not provided
+                    let result = sqlx::query(r#"
+                        UPDATE "OIDCProviders" SET
+                            providername = $2, clientid = $3,
+                            authorizationurl = $4, tokenurl = $5, userinfourl = $6,
+                            buttontext = $7, scope = $8, buttoncolor = $9,
+                            buttontextcolor = $10, iconsvg = $11, nameclaim = $12,
+                            emailclaim = $13, usernameclaim = $14, rolesclaim = $15,
+                            userrole = $16, adminrole = $17, modified = CURRENT_TIMESTAMP
+                        WHERE providerid = $1
+                    "#)
+                        .bind(provider_id)
+                        .bind(provider_name)
+                        .bind(client_id)
+                        .bind(authorization_url)
+                        .bind(token_url)
+                        .bind(user_info_url)
+                        .bind(button_text)
+                        .bind(scope)
+                        .bind(button_color)
+                        .bind(button_text_color)
+                        .bind(icon_svg)
+                        .bind(name_claim)
+                        .bind(email_claim)
+                        .bind(username_claim)
+                        .bind(roles_claim)
+                        .bind(user_role)
+                        .bind(admin_role)
+                        .execute(pool)
+                        .await?;
+                    result.rows_affected()
+                }
             }
             DatabasePool::MySQL(pool) => {
-                let result = sqlx::query("
-                    UPDATE OIDCProviders SET
-                        ProviderName = ?, ClientID = ?, ClientSecret = ?,
-                        AuthorizationURL = ?, TokenURL = ?, UserInfoURL = ?,
-                        ButtonText = ?, Scope = ?, ButtonColor = ?,
-                        ButtonTextColor = ?, IconSVG = ?, NameClaim = ?,
-                        EmailClaim = ?, UsernameClaim = ?, RolesClaim = ?,
-                        UserRole = ?, AdminRole = ?, Modified = CURRENT_TIMESTAMP
-                    WHERE ProviderID = ?
-                ")
-                    .bind(provider_name)
-                    .bind(client_id)
-                    .bind(client_secret)
-                    .bind(authorization_url)
-                    .bind(token_url)
-                    .bind(user_info_url)
-                    .bind(button_text)
-                    .bind(scope)
-                    .bind(button_color)
-                    .bind(button_text_color)
-                    .bind(icon_svg)
-                    .bind(name_claim)
-                    .bind(email_claim)
-                    .bind(username_claim)
-                    .bind(roles_claim)
-                    .bind(user_role)
-                    .bind(admin_role)
-                    .bind(provider_id)
-                    .execute(pool)
-                    .await?;
-                
-                result.rows_affected()
+                if let Some(secret) = client_secret {
+                    let result = sqlx::query("
+                        UPDATE OIDCProviders SET
+                            ProviderName = ?, ClientID = ?, ClientSecret = ?,
+                            AuthorizationURL = ?, TokenURL = ?, UserInfoURL = ?,
+                            ButtonText = ?, Scope = ?, ButtonColor = ?,
+                            ButtonTextColor = ?, IconSVG = ?, NameClaim = ?,
+                            EmailClaim = ?, UsernameClaim = ?, RolesClaim = ?,
+                            UserRole = ?, AdminRole = ?, Modified = CURRENT_TIMESTAMP
+                        WHERE ProviderID = ?
+                    ")
+                        .bind(provider_name)
+                        .bind(client_id)
+                        .bind(secret)
+                        .bind(authorization_url)
+                        .bind(token_url)
+                        .bind(user_info_url)
+                        .bind(button_text)
+                        .bind(scope)
+                        .bind(button_color)
+                        .bind(button_text_color)
+                        .bind(icon_svg)
+                        .bind(name_claim)
+                        .bind(email_claim)
+                        .bind(username_claim)
+                        .bind(roles_claim)
+                        .bind(user_role)
+                        .bind(admin_role)
+                        .bind(provider_id)
+                        .execute(pool)
+                        .await?;
+                    result.rows_affected()
+                } else {
+                    // Don't update client_secret if not provided
+                    let result = sqlx::query("
+                        UPDATE OIDCProviders SET
+                            ProviderName = ?, ClientID = ?,
+                            AuthorizationURL = ?, TokenURL = ?, UserInfoURL = ?,
+                            ButtonText = ?, Scope = ?, ButtonColor = ?,
+                            ButtonTextColor = ?, IconSVG = ?, NameClaim = ?,
+                            EmailClaim = ?, UsernameClaim = ?, RolesClaim = ?,
+                            UserRole = ?, AdminRole = ?, Modified = CURRENT_TIMESTAMP
+                        WHERE ProviderID = ?
+                    ")
+                        .bind(provider_name)
+                        .bind(client_id)
+                        .bind(authorization_url)
+                        .bind(token_url)
+                        .bind(user_info_url)
+                        .bind(button_text)
+                        .bind(scope)
+                        .bind(button_color)
+                        .bind(button_text_color)
+                        .bind(icon_svg)
+                        .bind(name_claim)
+                        .bind(email_claim)
+                        .bind(username_claim)
+                        .bind(roles_claim)
+                        .bind(user_role)
+                        .bind(admin_role)
+                        .bind(provider_id)
+                        .execute(pool)
+                        .await?;
+                    result.rows_affected()
+                }
             }
         };
         
@@ -14885,15 +14953,24 @@ impl DatabasePool {
     // Subscribe to person - matches Python subscribe_to_person function exactly
     pub async fn subscribe_to_person(&self, user_id: i32, person_id: i32, person_name: &str, person_img: &str, podcast_id: i32) -> AppResult<i32> {
         println!("Subscribing user {} to person {}: {}", user_id, person_id, person_name);
-        
+
         // Check if person already exists for this user and handle accordingly
         let result = match self {
             DatabasePool::Postgres(pool) => {
-                let existing = sqlx::query(r#"SELECT personid FROM "People" WHERE userid = $1 AND peopledbid = $2"#)
-                    .bind(user_id)
-                    .bind(person_id)
-                    .fetch_optional(pool)
-                    .await?;
+                // When peopledbid is 0 or not set, use name for lookup to avoid collisions
+                let existing = if person_id == 0 {
+                    sqlx::query(r#"SELECT personid FROM "People" WHERE userid = $1 AND LOWER(name) = LOWER($2)"#)
+                        .bind(user_id)
+                        .bind(person_name)
+                        .fetch_optional(pool)
+                        .await?
+                } else {
+                    sqlx::query(r#"SELECT personid FROM "People" WHERE userid = $1 AND peopledbid = $2"#)
+                        .bind(user_id)
+                        .bind(person_id)
+                        .fetch_optional(pool)
+                        .await?
+                };
                 
                 if let Some(row) = existing {
                     let person_db_id: i32 = row.try_get("personid")?;
@@ -14945,11 +15022,20 @@ impl DatabasePool {
                 }
             }
             DatabasePool::MySQL(pool) => {
-                let existing = sqlx::query("SELECT PersonID FROM People WHERE UserID = ? AND PeopleDBID = ?")
-                    .bind(user_id)
-                    .bind(person_id)
-                    .fetch_optional(pool)
-                    .await?;
+                // When peopledbid is 0 or not set, use name for lookup to avoid collisions
+                let existing = if person_id == 0 {
+                    sqlx::query("SELECT PersonID FROM People WHERE UserID = ? AND LOWER(Name) = LOWER(?)")
+                        .bind(user_id)
+                        .bind(person_name)
+                        .fetch_optional(pool)
+                        .await?
+                } else {
+                    sqlx::query("SELECT PersonID FROM People WHERE UserID = ? AND PeopleDBID = ?")
+                        .bind(user_id)
+                        .bind(person_id)
+                        .fetch_optional(pool)
+                        .await?
+                };
                 
                 if let Some(row) = existing {
                     let person_db_id: i32 = row.try_get("PersonID")?;
@@ -15007,24 +15093,44 @@ impl DatabasePool {
     // Unsubscribe from person - matches Python unsubscribe_from_person function exactly
     pub async fn unsubscribe_from_person(&self, user_id: i32, person_id: i32, person_name: &str) -> AppResult<bool> {
         println!("Unsubscribing user {} from person {}: {}", user_id, person_id, person_name);
-        
+
         // Find and delete the person record
         let rows_affected = match self {
             DatabasePool::Postgres(pool) => {
-                sqlx::query(r#"DELETE FROM "People" WHERE userid = $1 AND peopledbid = $2"#)
-                    .bind(user_id)
-                    .bind(person_id)
-                    .execute(pool)
-                    .await?
-                    .rows_affected()
+                // When peopledbid is 0 or not set, use name for lookup to avoid collisions
+                if person_id == 0 {
+                    sqlx::query(r#"DELETE FROM "People" WHERE userid = $1 AND LOWER(name) = LOWER($2)"#)
+                        .bind(user_id)
+                        .bind(person_name)
+                        .execute(pool)
+                        .await?
+                        .rows_affected()
+                } else {
+                    sqlx::query(r#"DELETE FROM "People" WHERE userid = $1 AND peopledbid = $2"#)
+                        .bind(user_id)
+                        .bind(person_id)
+                        .execute(pool)
+                        .await?
+                        .rows_affected()
+                }
             }
             DatabasePool::MySQL(pool) => {
-                sqlx::query("DELETE FROM People WHERE UserID = ? AND PeopleDBID = ?")
-                    .bind(user_id)
-                    .bind(person_id)
-                    .execute(pool)
-                    .await?
-                    .rows_affected()
+                // When peopledbid is 0 or not set, use name for lookup to avoid collisions
+                if person_id == 0 {
+                    sqlx::query("DELETE FROM People WHERE UserID = ? AND LOWER(Name) = LOWER(?)")
+                        .bind(user_id)
+                        .bind(person_name)
+                        .execute(pool)
+                        .await?
+                        .rows_affected()
+                } else {
+                    sqlx::query("DELETE FROM People WHERE UserID = ? AND PeopleDBID = ?")
+                        .bind(user_id)
+                        .bind(person_id)
+                        .execute(pool)
+                        .await?
+                        .rows_affected()
+                }
             }
         };
         
@@ -15586,14 +15692,32 @@ impl DatabasePool {
         }
     }
     
-    // Remove old YouTube videos - matches Python remove_old_youtube_videos function exactly
+    // Remove old YouTube videos - deletes videos and all their references from dependent tables
     pub async fn remove_old_youtube_videos(&self, podcast_id: i32, cutoff_date: chrono::DateTime<chrono::Utc>) -> AppResult<()> {
         println!("Removing old YouTube videos for podcast {} before {}", podcast_id, cutoff_date);
-        
+
         let cutoff_naive = cutoff_date.naive_utc();
-        
+
         let rows_affected = match self {
             DatabasePool::Postgres(pool) => {
+                // First, delete all references from dependent tables
+                let cleanup_queries = vec![
+                    r#"DELETE FROM "UserVideoHistory" WHERE videoid IN (SELECT videoid FROM "YouTubeVideos" WHERE podcastid = $1 AND publishedat < $2)"#,
+                    r#"DELETE FROM "SavedVideos" WHERE videoid IN (SELECT videoid FROM "YouTubeVideos" WHERE podcastid = $1 AND publishedat < $2)"#,
+                    r#"DELETE FROM "DownloadedVideos" WHERE videoid IN (SELECT videoid FROM "YouTubeVideos" WHERE podcastid = $1 AND publishedat < $2)"#,
+                    r#"DELETE FROM "PlaylistContents" WHERE videoid IN (SELECT videoid FROM "YouTubeVideos" WHERE podcastid = $1 AND publishedat < $2)"#,
+                    r#"DELETE FROM "EpisodeQueue" WHERE episodeid IN (SELECT videoid FROM "YouTubeVideos" WHERE podcastid = $1 AND publishedat < $2)"#,
+                ];
+
+                for query in cleanup_queries {
+                    sqlx::query(query)
+                        .bind(podcast_id)
+                        .bind(cutoff_naive)
+                        .execute(pool)
+                        .await?;
+                }
+
+                // Now delete the videos themselves
                 sqlx::query(r#"DELETE FROM "YouTubeVideos" WHERE podcastid = $1 AND publishedat < $2"#)
                     .bind(podcast_id)
                     .bind(cutoff_naive)
@@ -15602,6 +15726,24 @@ impl DatabasePool {
                     .rows_affected()
             }
             DatabasePool::MySQL(pool) => {
+                // First, delete all references from dependent tables
+                let cleanup_queries = vec![
+                    "DELETE FROM UserVideoHistory WHERE VideoID IN (SELECT VideoID FROM YouTubeVideos WHERE PodcastID = ? AND PublishedAt < ?)",
+                    "DELETE FROM SavedVideos WHERE VideoID IN (SELECT VideoID FROM YouTubeVideos WHERE PodcastID = ? AND PublishedAt < ?)",
+                    "DELETE FROM DownloadedVideos WHERE VideoID IN (SELECT VideoID FROM YouTubeVideos WHERE PodcastID = ? AND PublishedAt < ?)",
+                    "DELETE FROM PlaylistContents WHERE VideoID IN (SELECT VideoID FROM YouTubeVideos WHERE PodcastID = ? AND PublishedAt < ?)",
+                    "DELETE FROM EpisodeQueue WHERE EpisodeID IN (SELECT VideoID FROM YouTubeVideos WHERE PodcastID = ? AND PublishedAt < ?)",
+                ];
+
+                for query in cleanup_queries {
+                    sqlx::query(query)
+                        .bind(podcast_id)
+                        .bind(cutoff_naive)
+                        .execute(pool)
+                        .await?;
+                }
+
+                // Now delete the videos themselves
                 sqlx::query("DELETE FROM YouTubeVideos WHERE PodcastID = ? AND PublishedAt < ?")
                     .bind(podcast_id)
                     .bind(cutoff_naive)
@@ -15610,7 +15752,7 @@ impl DatabasePool {
                     .rows_affected()
             }
         };
-        
+
         println!("Removed {} old YouTube videos", rows_affected);
         Ok(())
     }
@@ -18590,7 +18732,7 @@ impl DatabasePool {
                 let row = playlist_row.unwrap();
                 let playlist_name: String = row.try_get("Name")?;
                 let playlist_description: String = row.try_get("Description").unwrap_or_default();
-                let episode_count: i64 = row.try_get("EpisodeCount")?;
+                let episode_count: i64 = row.try_get("episode_count")?;
                 let icon_name: String = row.try_get("IconName").unwrap_or_default();
                 let is_system_playlist: bool = row.try_get::<i8, _>("IsSystemPlaylist")? != 0;
 
@@ -23701,7 +23843,7 @@ impl DatabasePool {
                                     UserID, Name, Description, IsSystemPlaylist, MinDuration, MaxDuration, SortOrder,
                                     IncludeUnplayed, IncludePartiallyPlayed, IncludePlayed, TimeFilterHours,
                                     GroupByPodcast, MaxEpisodes, PlayProgressMin, PlayProgressMax, PodcastIDs,
-                                    IconName, episode_count
+                                    IconName, EpisodeCount
                                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                                 ")
                                 .bind(user_id).bind(name).bind(description).bind(false)
@@ -23783,7 +23925,7 @@ impl DatabasePool {
                                 UserID, Name, Description, IsSystemPlaylist, MinDuration, MaxDuration, SortOrder,
                                 IncludeUnplayed, IncludePartiallyPlayed, IncludePlayed, TimeFilterHours,
                                 GroupByPodcast, MaxEpisodes, PlayProgressMin, PlayProgressMax, PodcastIDs,
-                                IconName, episode_count
+                                IconName, EpisodeCount
                             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             ")
                             .bind(user_id).bind(name).bind(description).bind(false)
@@ -23871,7 +24013,7 @@ impl DatabasePool {
                         Ok(count) => {
                             // Update the episode_count in the playlist
                             match sqlx::query(
-                                r#"UPDATE Playlists SET episode_count = ? WHERE PlaylistID = ?"#
+                                r#"UPDATE Playlists SET EpisodeCount = ? WHERE PlaylistID = ?"#
                             ).bind(count).bind(playlist_id).execute(pool).await {
                                 Ok(_) => {
                                     debug!("Updated MySQL playlist '{}' (ID: {}) count to {}", name, playlist_id, count);
@@ -24098,38 +24240,97 @@ impl DatabasePool {
     fn map_timezone_for_postgres(user_timezone: &str) -> String {
         match user_timezone {
             // US timezone mappings
+            "US/Alaska" => "America/Anchorage".to_string(),
+            "US/Aleutian" => "America/Adak".to_string(),
+            "US/Arizona" => "America/Phoenix".to_string(),
             "US/Central" => "America/Chicago".to_string(),
+            "US/East-Indiana" => "America/Indiana/Indianapolis".to_string(),
             "US/Eastern" => "America/New_York".to_string(),
+            "US/Hawaii" => "Pacific/Honolulu".to_string(),
+            "US/Indiana-Starke" => "America/Indiana/Knox".to_string(),
+            "US/Michigan" => "America/Detroit".to_string(),
             "US/Mountain" => "America/Denver".to_string(),
             "US/Pacific" => "America/Los_Angeles".to_string(),
-            "US/Alaska" => "America/Anchorage".to_string(),
-            "US/Hawaii" => "Pacific/Honolulu".to_string(),
-            
-            // Common legacy timezone mappings
+            "US/Samoa" => "Pacific/Pago_Pago".to_string(),
+
+            // Canada timezone mappings
+            "Canada/Atlantic" => "America/Halifax".to_string(),
+            "Canada/Central" => "America/Winnipeg".to_string(),
+            "Canada/Eastern" => "America/Toronto".to_string(),
+            "Canada/Mountain" => "America/Edmonton".to_string(),
+            "Canada/Newfoundland" => "America/St_Johns".to_string(),
+            "Canada/Pacific" => "America/Vancouver".to_string(),
+            "Canada/Saskatchewan" => "America/Regina".to_string(),
+            "Canada/Yukon" => "America/Whitehorse".to_string(),
+
+            // Brazil timezone mappings
+            "Brazil/Acre" => "America/Rio_Branco".to_string(),
+            "Brazil/DeNoronha" => "America/Noronha".to_string(),
+            "Brazil/East" => "America/Sao_Paulo".to_string(),
+            "Brazil/West" => "America/Manaus".to_string(),
+
+            // Chile timezone mappings
+            "Chile/Continental" => "America/Santiago".to_string(),
+            "Chile/EasterIsland" => "Pacific/Easter".to_string(),
+
+            // Mexico timezone mappings
+            "Mexico/BajaNorte" => "America/Tijuana".to_string(),
+            "Mexico/BajaSur" => "America/Mazatlan".to_string(),
+            "Mexico/General" => "America/Mexico_City".to_string(),
+
+            // Common US legacy timezone abbreviations
             "EST" => "America/New_York".to_string(),
             "CST" => "America/Chicago".to_string(),
             "MST" => "America/Denver".to_string(),
             "PST" => "America/Los_Angeles".to_string(),
+            "HST" => "Pacific/Honolulu".to_string(),
             "EST5EDT" => "America/New_York".to_string(),
             "CST6CDT" => "America/Chicago".to_string(),
             "MST7MDT" => "America/Denver".to_string(),
             "PST8PDT" => "America/Los_Angeles".to_string(),
-            
-            // Common international legacy mappings
-            "GMT" => "UTC".to_string(),
-            "GMT+0" => "UTC".to_string(),
-            "GMT-0" => "UTC".to_string(),
-            "Greenwich" => "UTC".to_string(),
-            "UCT" => "UTC".to_string(),
-            "Universal" => "UTC".to_string(),
-            "Zulu" => "UTC".to_string(),
-            
+
             // European legacy mappings
             "CET" => "Europe/Paris".to_string(),
             "EET" => "Europe/Helsinki".to_string(),
             "WET" => "Europe/Lisbon".to_string(),
             "MET" => "Europe/Paris".to_string(),
-            
+
+            // Common international legacy mappings
+            "GMT" => "UTC".to_string(),
+            "GMT+0" => "UTC".to_string(),
+            "GMT-0" => "UTC".to_string(),
+            "GMT0" => "UTC".to_string(),
+            "Greenwich" => "UTC".to_string(),
+            "UCT" => "UTC".to_string(),
+            "Universal" => "UTC".to_string(),
+            "Zulu" => "UTC".to_string(),
+
+            // Country/region legacy mappings
+            "Cuba" => "America/Havana".to_string(),
+            "Egypt" => "Africa/Cairo".to_string(),
+            "Eire" => "Europe/Dublin".to_string(),
+            "GB" => "Europe/London".to_string(),
+            "GB-Eire" => "Europe/London".to_string(),
+            "Hongkong" => "Asia/Hong_Kong".to_string(),
+            "Iceland" => "Atlantic/Reykjavik".to_string(),
+            "Iran" => "Asia/Tehran".to_string(),
+            "Israel" => "Asia/Jerusalem".to_string(),
+            "Jamaica" => "America/Jamaica".to_string(),
+            "Japan" => "Asia/Tokyo".to_string(),
+            "Kwajalein" => "Pacific/Kwajalein".to_string(),
+            "Libya" => "Africa/Tripoli".to_string(),
+            "NZ" => "Pacific/Auckland".to_string(),
+            "NZ-CHAT" => "Pacific/Chatham".to_string(),
+            "Navajo" => "America/Denver".to_string(),
+            "PRC" => "Asia/Shanghai".to_string(),
+            "Poland" => "Europe/Warsaw".to_string(),
+            "Portugal" => "Europe/Lisbon".to_string(),
+            "ROC" => "Asia/Taipei".to_string(),
+            "ROK" => "Asia/Seoul".to_string(),
+            "Singapore" => "Asia/Singapore".to_string(),
+            "Turkey" => "Europe/Istanbul".to_string(),
+            "W-SU" => "Europe/Moscow".to_string(),
+
             // If it's already a valid IANA timezone name or unknown, pass through
             _ => {
                 // For unknown timezones, fall back to UTC to prevent errors
@@ -24414,10 +24615,10 @@ impl DatabasePool {
                 debug!("User {} timezone: {} -> {}", user_id, raw_timezone, user_timezone);
                 
                 let playlist_row = sqlx::query(
-                    r#"SELECT UserID, Name, Description, MinDuration, MaxDuration, SortOrder, 
+                    r#"SELECT UserID, Name, Description, MinDuration, MaxDuration, SortOrder,
                        IncludeUnplayed, IncludePartiallyPlayed, IncludePlayed, TimeFilterHours,
                        GroupByPodcast, MaxEpisodes, PlayProgressMin, PlayProgressMax, PodcastIDs,
-                       IsSystemPlaylist, Created, IconName, episode_count
+                       IsSystemPlaylist, Created, IconName, EpisodeCount
                        FROM Playlists WHERE PlaylistID = ?"#
                 ).bind(playlist_id).fetch_optional(pool).await?;
                 

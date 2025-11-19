@@ -2765,7 +2765,7 @@ def migration_032_create_user_default_playlists(conn, db_type: str):
                 'description': 'Perfect-length episodes (15-45 minutes) for your daily commute',
                 'min_duration': 900,   # 15 minutes
                 'max_duration': 2700,  # 45 minutes
-                'sort_order': 'random',
+                'sort_order': 'date_desc',
                 'icon_name': 'ph-car-simple',
                 'max_episodes': 1000
             }
@@ -3718,6 +3718,227 @@ def migration_035_add_podcast_cover_preference_columns(conn, db_type: str):
     
         logger.info("Podcast cover preference columns migration completed successfully")
         
+    finally:
+        cursor.close()
+
+
+@register_migration("036", "add_episodecount_column_to_playlists", "Add episodecount column to Playlists table for tracking episode counts", requires=["010"])
+def migration_036_add_episodecount_column(conn, db_type: str):
+    """Add episodecount column to Playlists table if it doesn't exist
+
+    This migration was needed because migration 032 was applied to existing databases
+    before the episodecount column addition was added to it. Since migration 032 is
+    already marked as applied in those databases, the column was never created.
+    """
+    cursor = conn.cursor()
+
+    try:
+        logger.info("Checking for episodecount column in Playlists table")
+
+        if db_type == "postgresql":
+            # Check if episodecount column exists
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'Playlists'
+                AND column_name = 'episodecount'
+            """)
+            column_exists = len(cursor.fetchall()) > 0
+
+            if not column_exists:
+                cursor.execute("""
+                    ALTER TABLE "Playlists"
+                    ADD COLUMN episodecount INTEGER DEFAULT 0
+                """)
+                logger.info("Added episodecount column to Playlists table (PostgreSQL)")
+            else:
+                logger.info("episodecount column already exists in Playlists table (PostgreSQL)")
+        else:
+            # Check if episodecount column exists (MySQL/MariaDB)
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'Playlists'
+                AND COLUMN_NAME = 'EpisodeCount'
+                AND TABLE_SCHEMA = DATABASE()
+            """)
+            column_exists = cursor.fetchone()[0] > 0
+
+            if not column_exists:
+                cursor.execute("""
+                    ALTER TABLE Playlists
+                    ADD COLUMN EpisodeCount INT DEFAULT 0
+                """)
+                logger.info("Added EpisodeCount column to Playlists table (MySQL/MariaDB)")
+            else:
+                logger.info("EpisodeCount column already exists in Playlists table (MySQL/MariaDB)")
+
+        logger.info("episodecount column migration completed successfully")
+
+    except Exception as e:
+        logger.error(f"Error in migration 036: {e}")
+        raise
+    finally:
+        cursor.close()
+
+
+@register_migration("037", "fix_shared_episodes_schema", "Add missing SharedBy and SharedWith columns to SharedEpisodes table", requires=["009"])
+def migration_037_fix_shared_episodes_schema(conn, db_type: str):
+    """Add missing SharedBy and SharedWith columns to SharedEpisodes table
+
+    Old schema had: EpisodeID, UrlKey, ExpirationDate
+    New schema needs: EpisodeID, SharedBy, SharedWith, ShareCode, ExpirationDate
+    """
+    cursor = conn.cursor()
+
+    try:
+        logger.info("Starting SharedEpisodes schema fix migration")
+
+        if db_type == "postgresql":
+            # Check if sharedby column exists
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'SharedEpisodes'
+                AND column_name = 'sharedby'
+            """)
+            sharedby_exists = len(cursor.fetchall()) > 0
+
+            if not sharedby_exists:
+                logger.info("Adding sharedby column to SharedEpisodes table (PostgreSQL)")
+                cursor.execute("""
+                    ALTER TABLE "SharedEpisodes"
+                    ADD COLUMN sharedby INTEGER NOT NULL DEFAULT 1
+                """)
+                conn.commit()
+
+            # Check if sharedwith column exists
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'SharedEpisodes'
+                AND column_name = 'sharedwith'
+            """)
+            sharedwith_exists = len(cursor.fetchall()) > 0
+
+            if not sharedwith_exists:
+                logger.info("Adding sharedwith column to SharedEpisodes table (PostgreSQL)")
+                cursor.execute("""
+                    ALTER TABLE "SharedEpisodes"
+                    ADD COLUMN sharedwith INTEGER
+                """)
+                conn.commit()
+
+            # Check if sharecode column exists (might have been UrlKey)
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'SharedEpisodes'
+                AND column_name = 'sharecode'
+            """)
+            sharecode_exists = len(cursor.fetchall()) > 0
+
+            if not sharecode_exists:
+                # Check if UrlKey exists
+                cursor.execute("""
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_name = 'SharedEpisodes'
+                    AND column_name IN ('UrlKey', 'urlkey')
+                """)
+                urlkey_result = cursor.fetchall()
+
+                if urlkey_result:
+                    urlkey_name = urlkey_result[0][0]
+                    logger.info(f"Renaming {urlkey_name} to sharecode (PostgreSQL)")
+                    cursor.execute(f"""
+                        ALTER TABLE "SharedEpisodes"
+                        RENAME COLUMN "{urlkey_name}" TO sharecode
+                    """)
+                else:
+                    logger.info("Adding sharecode column to SharedEpisodes table (PostgreSQL)")
+                    cursor.execute("""
+                        ALTER TABLE "SharedEpisodes"
+                        ADD COLUMN sharecode TEXT UNIQUE
+                    """)
+                conn.commit()
+
+            logger.info("SharedEpisodes schema fix completed (PostgreSQL)")
+
+        else:  # MySQL/MariaDB
+            # Check if SharedBy column exists
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'SharedEpisodes'
+                AND COLUMN_NAME = 'SharedBy'
+                AND TABLE_SCHEMA = DATABASE()
+            """)
+            sharedby_exists = cursor.fetchone()[0] > 0
+
+            if not sharedby_exists:
+                logger.info("Adding SharedBy column to SharedEpisodes table (MySQL)")
+                cursor.execute("""
+                    ALTER TABLE SharedEpisodes
+                    ADD COLUMN SharedBy INT NOT NULL DEFAULT 1
+                """)
+                conn.commit()
+
+            # Check if SharedWith column exists
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'SharedEpisodes'
+                AND COLUMN_NAME = 'SharedWith'
+                AND TABLE_SCHEMA = DATABASE()
+            """)
+            sharedwith_exists = cursor.fetchone()[0] > 0
+
+            if not sharedwith_exists:
+                logger.info("Adding SharedWith column to SharedEpisodes table (MySQL)")
+                cursor.execute("""
+                    ALTER TABLE SharedEpisodes
+                    ADD COLUMN SharedWith INT
+                """)
+                conn.commit()
+
+            # Check if ShareCode column exists (might have been UrlKey)
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'SharedEpisodes'
+                AND COLUMN_NAME = 'ShareCode'
+                AND TABLE_SCHEMA = DATABASE()
+            """)
+            sharecode_exists = cursor.fetchone()[0] > 0
+
+            if not sharecode_exists:
+                # Check if UrlKey exists
+                cursor.execute("""
+                    SELECT COUNT(*)
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_NAME = 'SharedEpisodes'
+                    AND COLUMN_NAME = 'UrlKey'
+                    AND TABLE_SCHEMA = DATABASE()
+                """)
+                urlkey_exists = cursor.fetchone()[0] > 0
+
+                if urlkey_exists:
+                    logger.info("Renaming UrlKey to ShareCode (MySQL)")
+                    cursor.execute("""
+                        ALTER TABLE SharedEpisodes
+                        CHANGE COLUMN UrlKey ShareCode TEXT
+                    """)
+                else:
+                    logger.info("Adding ShareCode column to SharedEpisodes table (MySQL)")
+                    cursor.execute("""
+                        ALTER TABLE SharedEpisodes
+                        ADD COLUMN ShareCode TEXT
+                    """)
+                conn.commit()
+
+            logger.info("SharedEpisodes schema fix completed (MySQL)")
+
+        logger.info("SharedEpisodes schema fix migration completed successfully")
+
+    except Exception as e:
+        logger.error(f"Error in migration 037: {e}")
+        raise
     finally:
         cursor.close()
 
