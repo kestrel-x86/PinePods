@@ -80,6 +80,8 @@ postgresql:
   # -- Enable PostgreSQL deployment
   # Set to false if using external database
   enabled: true
+  image:
+    repository: bitnamilegacy/postgresql
   auth:
     # -- PostgreSQL username
     username: postgres
@@ -137,6 +139,8 @@ resources: {}
 valkey:
   # -- Enable Valkey deployment
   enabled: true
+  image:
+    repository: bitnamilegacy/valkey
   architecture: standalone  # This prevents replica creation
   auth:
     enabled: false
