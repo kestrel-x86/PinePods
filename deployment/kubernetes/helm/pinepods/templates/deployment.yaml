@@ -29,12 +29,15 @@ spec:
             - secretRef:
                 name: {{ include "pinepods.fullname" $ }}-env
           env:
-            {{ if (and (not .Values.postgresql.enabled) (.Values.externalDatabase.existingSecret.enabled)) -}}
+            {{ if (and (not .Values.postgresql.enabled) (.Values.externalDatabase.existingSecret.enabled) (not .Values.externalDatabase.manuallyProvide)) -}}
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.externalDatabase.existingSecret.name }}
                   key: {{ .Values.externalDatabase.existingSecret.key }}
+            {{- end }}
+            {{- with .Values.extraEnv}}
+              {{- toYaml . | nindent 12 }}
             {{- end }}
           volumeMounts:
             {{- if .Values.persistence.enabled }}
