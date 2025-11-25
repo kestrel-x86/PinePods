@@ -535,8 +535,12 @@ pub async fn call_parse_podcast_url(
         // Convert JSON episodes to Episode structs
         let mut episodes: Vec<Episode> = episodes_json
             .iter()
-            .filter_map(|episode_json| Episode::from_json(&episode_json).ok())
+            .filter_map(|episode_json| Episode::deserialize(episode_json).ok())
             .collect();
+
+        for ep in episodes.iter_mut() {
+            ep.feedurl = podcast_url.to_string();
+        }
 
         // Sort episodes by publication date (newest first)
         episodes.sort_by(|a, b| {

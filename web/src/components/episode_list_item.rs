@@ -293,7 +293,7 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
             browser_history.clone(),
             app_dispatch.clone(),
             props.episode.episodeid.clone(),
-            props.episode.episodeurl.clone(),
+            props.episode.feedurl.clone(),
             src,
             props.episode.episodetitle.clone(),
             true,
