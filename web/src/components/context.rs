@@ -199,6 +199,11 @@ impl DownloadedEpisodeRecords {
         self.local_ids.contains(&id)
     }
 
+    /// Checks if episode is downloaded to either the server or locally
+    pub fn is_download(&self, id: i32) -> bool {
+        return self.is_local_download(id) || self.is_server_download(id);
+    }
+
     /// Add a record of an Episode downloaded locally
     pub fn push_local(&mut self, episode: Episode) {
         let id = episode.episodeid;

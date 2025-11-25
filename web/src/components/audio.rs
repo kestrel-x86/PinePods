@@ -1497,12 +1497,13 @@ pub fn audio_player(props: &AudioPlayerProps) -> Html {
                         let episode_id = props.episode_id;
                         let show_modal = show_modal.clone();
                         let title_click = title_click.clone();
-
+                        let props = props.clone();
                         Callback::from(move |e: MouseEvent| {
                             show_modal.set(false);  // Close modal before navigation
                             title_click.emit(e);
                             let dispatch_clone = dispatch.clone();
                             let history_clone = history.clone();
+                            let props = props.clone();
                             wasm_bindgen_futures::spawn_local(async move {
                                 dispatch_clone.reduce_mut(move |state| {
                                     // Only clear fetched_episode if we're navigating to a different episode
@@ -1511,7 +1512,31 @@ pub fn audio_player(props: &AudioPlayerProps) -> Html {
                                     }
                                     state.selected_episode_id = Some(episode_id);
                                 });
-                                history_clone.push(format!("/episode?episode_id={}", episode_id));
+                                if episode_id != 0 {
+                                    history_clone.push(format!("/episode?episode_id={}", episode_id));
+                                } else {
+                                    let mut new_url = "/episode".to_string();
+                                    new_url.push_str("?podcast_title=");
+                                    new_url.push_str(&urlencoding::encode(&props.title));
+                                    new_url.push_str("&episode_url=");
+                                    new_url.push_str(&urlencoding::encode(&props.episode.episodeurl));
+                                    new_url.push_str("&audio_url=");
+                                    new_url.push_str(&urlencoding::encode(&props.src));
+                                    new_url.push_str("&is_youtube=");
+                                    new_url.push_str(&props.is_youtube.to_string());
+
+                                    history_clone.push(new_url);
+
+                                    dispatch_clone.reduce_mut(move |state| {
+                                        state.selected_episode_id = Some(episode_id);
+                                        state.selected_episode_url = Some(props.episode.episodeurl.clone());
+                                        state.selected_episode_audio_url = Some(props.src.clone());
+                                        state.selected_podcast_title = Some(props.title.clone());
+                                        state.person_episode = Some(false);
+                                        state.selected_is_youtube = props.episode.is_youtube;
+                                        state.fetched_episode = None;
+                                    });
+                                }
                             });
                         })
                     };

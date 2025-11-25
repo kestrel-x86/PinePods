@@ -236,6 +236,7 @@
     "downloading": "Downloading...",
     "episode_transcript": "Episode Transcript",
     "failed_to_parse_duration": "Failed to parse duration",
+    "failed_to_find_podcast_metadata": "Failed to find podcast's metadata.",
     "in_this_episode": "In This Episode",
     "mark_complete": "Mark Complete",
     "mark_episode_complete": "Mark Episode Complete",

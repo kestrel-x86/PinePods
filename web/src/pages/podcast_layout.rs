@@ -436,8 +436,8 @@ pub fn podcast_item(props: &PodcastProps) -> Html {
                         dispatch.reduce_mut(|state| state.is_loading = Some(false));
                         history.push("/episode_layout"); // Navigate to episode_layout
                     }
-                    Err(_e) => {
-                        // web_sys::console::log_1(&format!("Error: {}", e).into());
+                    Err(e) => {
+                        web_sys::console::log_1(&format!("Error: {}", e).into());
                     }
                 }
             });

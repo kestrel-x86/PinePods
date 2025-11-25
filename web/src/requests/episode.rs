@@ -20,12 +20,14 @@ pub struct Episode {
     pub podcastid: i32,
     pub podcastname: String,
     #[serde(alias = "Episodetitle")]
+    #[serde(alias = "title")]
     pub episodetitle: String,
-    pub description: String,
+    //pub description: String,
     pub artworkurl: String,
     pub author: String,
     pub categories: Option<HashMap<String, String>>,
     #[serde(alias = "Episodedescription")]
+    #[serde(alias = "description")]
     pub episodedescription: String,
     pub episodecount: Option<i32>,
     pub feedurl: String,
@@ -35,12 +37,16 @@ pub struct Episode {
     #[serde(alias = "Episodeid")]
     pub episodeid: i32,
     #[serde(alias = "Episodeurl")]
+    #[serde(alias = "enclosure_url")]
     pub episodeurl: String,
     #[serde(alias = "Episodeartwork")]
+    #[serde(alias = "artwork")]
     pub episodeartwork: String,
     #[serde(alias = "Episodepubdate")]
+    #[serde(alias = "pub_date")]
     pub episodepubdate: String,
     #[serde(alias = "Episodeduration")]
+    #[serde(alias = "duration")]
     pub episodeduration: i32,
     #[serde(alias = "Listenduration", deserialize_with = "null_as_zero")]
     pub listenduration: i32,
@@ -58,15 +64,5 @@ pub struct Episode {
 impl Episode {
     pub fn as_any(&self) -> &dyn Any {
         self
-    }
-
-    /// Parse json Value to populate an Episode struct
-    /// Any field not included in the json will be filled with its default value
-    ///
-    /// Surely there is a better way? Just converts the Value back to string, then deserializes
-    /// that string into an Espiode.
-    pub fn from_json(json: &serde_json::value::Value) -> Result<Self, serde_json::Error> {
-        let j = serde_json::to_string(json)?;
-        serde_json::from_str::<Self>(&j)
     }
 }

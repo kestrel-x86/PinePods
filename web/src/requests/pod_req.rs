@@ -1290,9 +1290,15 @@ pub async fn call_get_episode_metadata(
 
     let response_text = response.text().await?;
 
-    let ep: Episode = serde_json::from_str(&response_text)
+    #[derive(Deserialize)]
+    struct Response {
+        episode: Episode,
+    }
+
+    let resp: Response = serde_json::from_str(&response_text)
         .map_err(|e| anyhow::Error::msg(format!("Deserialization Error: {}", e)))?;
-    Ok(ep)
+
+    Ok(resp.episode)
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]

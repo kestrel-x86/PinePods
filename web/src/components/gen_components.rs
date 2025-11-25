@@ -706,17 +706,31 @@ pub fn on_shownotes_click(
         let history_clone = history.clone();
 
         wasm_bindgen_futures::spawn_local(async move {
-            dispatch_clone.reduce_mut(move |state| {
-                state.selected_episode_id = Some(episode_id);
-                state.selected_episode_url = Some(show_notes);
-                state.selected_episode_audio_url = Some(ep_aud);
-                state.selected_podcast_title = Some(pod_title);
-                state.person_episode = Some(person_episode);
-                state.selected_is_youtube = is_youtube;
-                state.fetched_episode = None;
-            });
+            if episode_id != 0 {
+                history_clone.push(format!("/episode?episode_id={}", episode_id));
+            } else {
+                let mut new_url = "/episode".to_string();
+                new_url.push_str("?podcast_title=");
+                new_url.push_str(&urlencoding::encode(&pod_title));
+                new_url.push_str("&episode_url=");
+                new_url.push_str(&urlencoding::encode(&show_notes));
+                new_url.push_str("&audio_url=");
+                new_url.push_str(&urlencoding::encode(&ep_aud));
+                new_url.push_str("&is_youtube=");
+                new_url.push_str(&is_youtube.to_string());
 
-            history_clone.push("/episode");
+                history_clone.push(new_url);
+
+                dispatch_clone.reduce_mut(move |state| {
+                    state.selected_episode_id = Some(episode_id);
+                    state.selected_episode_url = Some(show_notes);
+                    state.selected_episode_audio_url = Some(ep_aud);
+                    state.selected_podcast_title = Some(pod_title);
+                    state.person_episode = Some(person_episode);
+                    state.selected_is_youtube = is_youtube;
+                    state.fetched_episode = None;
+                });
+            }
         });
     })
 }

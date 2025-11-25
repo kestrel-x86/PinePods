@@ -849,7 +849,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                                             &episode.guid.clone()
                                         );
 
-                                        let sanitized_description = sanitize_html_with_blank_target(&episode.description.clone());
+                                        let sanitized_description = sanitize_html_with_blank_target(&episode.episodedescription.clone());
                                         let (description, _is_truncated) = if is_expanded {
                                             (sanitized_description, false)
                                         } else {
