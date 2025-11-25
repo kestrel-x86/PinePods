@@ -3012,7 +3012,7 @@ pub struct EpisodeMetadata {
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct SharedEpisodeResponse {
-    pub episode: EpisodeMetadata,
+    pub episode: Episode,
 }
 
 #[allow(dead_code)]

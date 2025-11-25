@@ -33,6 +33,7 @@ use yewdux::prelude::*;
 
 #[derive(Properties, PartialEq, Debug, Clone)]
 pub struct AudioPlayerProps {
+    pub episode: Episode,
     pub src: String,
     pub title: String,
     pub description: String,
@@ -1510,7 +1511,7 @@ pub fn audio_player(props: &AudioPlayerProps) -> Html {
                                     }
                                     state.selected_episode_id = Some(episode_id);
                                 });
-                                history_clone.push("/episode");
+                                history_clone.push(format!("/episode?episode_id={}", episode_id));
                             });
                         })
                     };
@@ -1784,6 +1785,7 @@ pub fn on_play_click(
         let description = episode.episodedescription.clone();
         let pubdate = episode.episodepubdate.clone();
         let artworkurl = episode.episodeartwork.clone();
+        let episode = episode.clone();
         wasm_bindgen_futures::spawn_local(async move {
             // Function to get actual duration from audio file
             async fn get_actual_duration(audio_src: &str) -> Option<f64> {
@@ -1906,6 +1908,7 @@ pub fn on_play_click(
                                     audio_state.audio_volume = 100.0;
                                     audio_state.offline = Some(false);
                                     audio_state.currently_playing = Some(AudioPlayerProps {
+                                        episode: episode.clone(),
                                         src: src.clone(),
                                         title: title,
                                         description: description,
@@ -1949,6 +1952,7 @@ pub fn on_play_click(
                     audio_state.audio_volume = 100.0;
                     audio_state.offline = Some(false);
                     audio_state.currently_playing = Some(AudioPlayerProps {
+                        episode: episode.clone(),
                         src: src.clone(),
                         title: title,
                         description: description,
@@ -2013,12 +2017,12 @@ pub fn on_play_pause_offline(
 
 #[cfg(not(feature = "server_build"))]
 pub fn on_play_click_offline(
-    episode_info: Episode,
+    episode: Episode,
     audio_dispatch: Dispatch<UIState>,
     app_dispatch: Dispatch<AppState>,
 ) -> Callback<MouseEvent> {
     Callback::from(move |_: MouseEvent| {
-        let episode_info_for_closure = episode_info.clone();
+        let episode_info_for_closure = episode.clone();
         let audio_dispatch = audio_dispatch.clone();
         let app_dispatch = app_dispatch.clone();
 
@@ -2040,8 +2044,9 @@ pub fn on_play_click_offline(
         let episode_duration_for_wasm = episode_info_for_closure.episodeduration.clone();
         let episode_id_for_wasm = episode_info_for_closure.episodeid.clone();
         let listen_duration_for_closure = episode_info_for_closure.listenduration;
-        let episode_is_youtube_for_wasm = episode_info.is_youtube.clone();
+        let episode_is_youtube_for_wasm = episode.is_youtube.clone();
 
+        let episode = episode.clone();
         wasm_bindgen_futures::spawn_local(async move {
             match start_local_file_server(&file_path).await {
                 Ok(server_url) => {
@@ -2149,6 +2154,7 @@ pub fn on_play_click_offline(
                         audio_state.audio_volume = 100.0;
                         audio_state.offline = Some(true);
                         audio_state.currently_playing = Some(AudioPlayerProps {
+                            episode: episode.clone(),
                             src: src.clone(),
                             title: episode_title_for_wasm.clone(),
                             description: episode_description_for_wasm.clone(),
@@ -2182,6 +2188,7 @@ pub fn on_play_click_offline(
 
 #[allow(dead_code)]
 pub fn on_play_click_shared(
+    episode: Episode,
     episode_url: String,
     episode_title: String,
     episode_description: String,
@@ -2206,7 +2213,7 @@ pub fn on_play_click_shared(
         // NEW: Analyze duration before playing
         let audio_dispatch_for_duration = audio_dispatch.clone();
         let episode_url_for_analysis = episode_url.clone();
-
+        let episode = episode.clone();
         wasm_bindgen_futures::spawn_local(async move {
             // Function to get actual duration from audio file
             async fn get_actual_duration(audio_src: &str) -> Option<f64> {
@@ -2288,6 +2295,7 @@ pub fn on_play_click_shared(
                 audio_state.audio_volume = 100.0;
                 audio_state.offline = Some(false);
                 audio_state.currently_playing = Some(AudioPlayerProps {
+                    episode: episode.clone(),
                     src: episode_url.clone(),
                     title: episode_title.clone(),
                     description: episode_description.clone(),

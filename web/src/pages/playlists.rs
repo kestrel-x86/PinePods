@@ -1591,6 +1591,7 @@ pub fn playlists() -> Html {
                 // Audio player if something is playing
                 if let Some(audio_props) = &audio_state.currently_playing {
                     <AudioPlayer
+                        episode={audio_props.episode.clone()}
                         src={audio_props.src.clone()}
                         title={audio_props.title.clone()}
                         description={audio_props.description.clone()}

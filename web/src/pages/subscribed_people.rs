@@ -263,6 +263,7 @@ pub fn subscribed_people() -> Html {
                 if let Some(audio_props) = &audio_state.currently_playing {
                     html! {
                         <AudioPlayer
+                            episode={audio_props.episode.clone()}
                             src={audio_props.src.clone()}
                             title={audio_props.title.clone()}
                             description={audio_props.description.clone()}
