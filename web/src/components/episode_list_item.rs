@@ -63,7 +63,7 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
     });
 
     // We still need the dispatcher for actions
-    let app_dispatch = Dispatch::<AppState>::global();
+    let (_app_state, app_dispatch) = use_store::<AppState>();
 
     let (audio_state, audio_dispatch) = use_store::<UIState>();
     let (desc_state, desc_dispatch) = use_store::<ExpandedDescriptions>();
