@@ -80,6 +80,8 @@ postgresql:
   # -- Enable PostgreSQL deployment
   # Set to false if using external database
   enabled: true
+  image:
+    repository: bitnamilegacy/postgresql
   auth:
     # -- PostgreSQL username
     username: postgres
@@ -130,6 +132,8 @@ externalDatabase:
     enabled: false
     name: existing-secret
     key: password
+  # -- manually provide the DB environment variables under extraEnv. Useful for DB solutions like CNPG
+  manuallyProvide: false
 
 resources: {}
 
@@ -137,6 +141,8 @@ resources: {}
 valkey:
   # -- Enable Valkey deployment
   enabled: true
+  image:
+    repository: bitnamilegacy/valkey
   architecture: standalone  # This prevents replica creation
   auth:
     enabled: false
@@ -177,6 +183,16 @@ env:
   # -- Debug mode
   # Set to true for additional logging
   DEBUG_MODE: "false"
+
+## Allows you to specify additional environment values directly on the application pod. Useful for specific configmap or secret references.
+extraEnv: []
+# - name: CUSTOM_VARIABLE
+#   value: "true"
+# - name: DB_HOST
+#   valueFrom:
+#     secretKeyRef:
+#       name: pinepods-db-app
+#       key: host
 
 ## Pod Security Context
 securityContext: {}

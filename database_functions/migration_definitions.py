@@ -3943,6 +3943,145 @@ def migration_037_fix_shared_episodes_schema(conn, db_type: str):
         cursor.close()
 
 
+@register_migration("107", "fix_gpodder_episode_actions_antennapod", "Fix existing GPodder episode actions to include Started and Total fields for AntennaPod compatibility", requires=["103"])
+def migration_107_fix_gpodder_episode_actions(conn, db_type: str):
+    """
+    Fix existing GPodder episode actions to be compatible with AntennaPod.
+    AntennaPod requires all play actions to have Started, Position, and Total fields.
+    This migration adds those fields by joining with the Episodes table to get duration.
+    """
+    cursor = conn.cursor()
+
+    try:
+        logger.info("Starting GPodder episode actions fix for AntennaPod compatibility...")
+
+        if db_type == "postgresql":
+            # First, count how many actions need fixing
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM "GpodderSyncEpisodeActions"
+                WHERE action = 'play'
+                AND (started IS NULL OR total IS NULL OR started < 0 OR total <= 0)
+            """)
+            count_result = cursor.fetchone()
+            actions_to_fix = count_result[0] if count_result else 0
+
+            logger.info(f"Found {actions_to_fix} play actions that need fixing (PostgreSQL)")
+
+            if actions_to_fix > 0:
+                # Update from Episodes table join
+                logger.info("Updating episode actions with duration from Episodes table...")
+                cursor.execute("""
+                    UPDATE "GpodderSyncEpisodeActions" AS gsa
+                    SET
+                        started = 0,
+                        total = e.episodeduration
+                    FROM "Episodes" e
+                    WHERE gsa.action = 'play'
+                    AND gsa.episodeurl = e.episodeurl
+                    AND e.episodeduration IS NOT NULL
+                    AND e.episodeduration > 0
+                    AND (gsa.started IS NULL OR gsa.total IS NULL OR gsa.started < 0 OR gsa.total <= 0)
+                """)
+                conn.commit()
+
+                # Fallback: use Position as Total for episodes not in Episodes table
+                logger.info("Updating remaining actions using Position as fallback for Total...")
+                cursor.execute("""
+                    UPDATE "GpodderSyncEpisodeActions"
+                    SET
+                        started = 0,
+                        total = COALESCE(position, 1)
+                    WHERE action = 'play'
+                    AND (started IS NULL OR total IS NULL OR started < 0 OR total <= 0)
+                    AND position IS NOT NULL
+                    AND position > 0
+                """)
+                conn.commit()
+
+                # Final cleanup: set minimal valid values for any remaining invalid actions
+                logger.info("Final cleanup: setting minimal valid values for remaining invalid actions...")
+                cursor.execute("""
+                    UPDATE "GpodderSyncEpisodeActions"
+                    SET
+                        started = 0,
+                        total = 1
+                    WHERE action = 'play'
+                    AND (started IS NULL OR total IS NULL OR started < 0 OR total <= 0)
+                """)
+                conn.commit()
+
+                # Verify the fix
+                cursor.execute("""
+                    SELECT COUNT(*)
+                    FROM "GpodderSyncEpisodeActions"
+                    WHERE action = 'play'
+                    AND (started IS NULL OR total IS NULL OR started < 0 OR total <= 0 OR position <= 0)
+                """)
+                remaining_result = cursor.fetchone()
+                remaining_broken = remaining_result[0] if remaining_result else 0
+
+                logger.info(f"Fixed {actions_to_fix - remaining_broken} episode actions (PostgreSQL)")
+                if remaining_broken > 0:
+                    logger.warning(f"{remaining_broken} actions still have invalid fields - these may need manual review")
+            else:
+                logger.info("No actions need fixing (PostgreSQL)")
+
+        else:  # MySQL/MariaDB
+            # First, count how many actions need fixing
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM GpodderSyncEpisodeActions
+                WHERE Action = 'play'
+                AND (Started IS NULL OR Total IS NULL OR Started < 0 OR Total <= 0)
+            """)
+            count_result = cursor.fetchone()
+            actions_to_fix = count_result[0] if count_result else 0
+
+            logger.info(f"Found {actions_to_fix} play actions that need fixing (MySQL)")
+
+            if actions_to_fix > 0:
+                # MySQL: Update using JOIN
+                logger.info("Updating episode actions with duration from Episodes table...")
+                cursor.execute("""
+                    UPDATE GpodderSyncEpisodeActions AS gsa
+                    LEFT JOIN Episodes e ON gsa.EpisodeURL = e.EpisodeURL
+                        AND e.EpisodeDuration IS NOT NULL
+                        AND e.EpisodeDuration > 0
+                    SET
+                        gsa.Started = 0,
+                        gsa.Total = COALESCE(e.EpisodeDuration, gsa.Position, 1)
+                    WHERE gsa.Action = 'play'
+                    AND (gsa.Started IS NULL OR gsa.Total IS NULL OR gsa.Started < 0 OR gsa.Total <= 0)
+                """)
+                conn.commit()
+
+                # Verify the fix
+                cursor.execute("""
+                    SELECT COUNT(*)
+                    FROM GpodderSyncEpisodeActions
+                    WHERE Action = 'play'
+                    AND (Started IS NULL OR Total IS NULL OR Started < 0 OR Total <= 0 OR Position <= 0)
+                """)
+                remaining_result = cursor.fetchone()
+                remaining_broken = remaining_result[0] if remaining_result else 0
+
+                logger.info(f"Fixed {actions_to_fix - remaining_broken} episode actions (MySQL)")
+                if remaining_broken > 0:
+                    logger.warning(f"{remaining_broken} actions still have invalid fields - these may need manual review")
+            else:
+                logger.info("No actions need fixing (MySQL)")
+
+        logger.info("GPodder episode actions fix migration completed successfully")
+        logger.info("AntennaPod should now be able to sync episode actions correctly")
+
+    except Exception as e:
+        logger.error(f"Error in migration 107: {e}")
+        raise
+    finally:
+        cursor.close()
+
+
 if __name__ == "__main__":
     # Register all migrations and run them
     register_all_migrations()
