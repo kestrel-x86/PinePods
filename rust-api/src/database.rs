@@ -22568,17 +22568,19 @@ impl DatabasePool {
         match self {
             DatabasePool::Postgres(pool) => {
                 let rows = sqlx::query(r#"
-                    SELECT 
-                        e.episodeurl as podcast,
+                    SELECT
+                        p.feedurl as podcast,
                         e.episodeurl as episode,
                         eh.listenduration as position,
-                        CASE 
+                        e.episodeduration as total,
+                        CASE
                             WHEN eh.listenduration > 0 THEN 'play'
                             WHEN d.episodeid IS NOT NULL THEN 'download'
                             ELSE 'new'
                         END as action,
                         COALESCE(eh.listendate, '1970-01-01'::timestamp) as timestamp
                     FROM "Episodes" e
+                    JOIN "Podcasts" p ON e.podcastid = p.podcastid AND p.userid = $1
                     LEFT JOIN "UserEpisodeHistory" eh ON e.episodeid = eh.episodeid AND eh.userid = $1
                     LEFT JOIN "DownloadedEpisodes" d ON e.episodeid = d.episodeid AND d.userid = $1
                     WHERE (eh.userid = $1 OR d.userid = $1)
@@ -22589,37 +22591,51 @@ impl DatabasePool {
                 .bind(since)
                 .fetch_all(pool)
                 .await?;
-                
+
                 let mut actions = Vec::new();
                 for row in rows {
                     // Handle PostgreSQL TIMESTAMP (not TIMESTAMPTZ) column
                     let naive_timestamp: chrono::NaiveDateTime = row.try_get("timestamp")?;
                     let utc_timestamp = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(naive_timestamp, chrono::Utc);
                     let timestamp_str = utc_timestamp.to_rfc3339();
-                    
-                    actions.push(serde_json::json!({
+
+                    let action: String = row.try_get("action")?;
+                    let position: Option<i32> = row.try_get("position").ok().flatten();
+                    let total: Option<i32> = row.try_get("total").ok().flatten();
+
+                    // For play actions, include started, position, and total (required by AntennaPod)
+                    let mut action_json = serde_json::json!({
                         "podcast": row.try_get::<String, _>("podcast")?,
                         "episode": row.try_get::<String, _>("episode")?,
-                        "action": row.try_get::<String, _>("action")?,
+                        "action": action,
                         "timestamp": timestamp_str,
-                        "position": row.try_get::<Option<i32>, _>("position").unwrap_or(None)
-                    }));
+                    });
+
+                    if action == "play" && position.is_some() && total.is_some() {
+                        action_json["started"] = serde_json::json!(0); // Always start from 0
+                        action_json["position"] = serde_json::json!(position.unwrap());
+                        action_json["total"] = serde_json::json!(total.unwrap());
+                    }
+
+                    actions.push(action_json);
                 }
                 Ok(actions)
             }
             DatabasePool::MySQL(pool) => {
                 let rows = sqlx::query("
-                    SELECT 
-                        e.EpisodeURL as podcast,
+                    SELECT
+                        p.FeedURL as podcast,
                         e.EpisodeURL as episode,
                         eh.ListenDuration as position,
-                        CASE 
+                        e.EpisodeDuration as total,
+                        CASE
                             WHEN eh.ListenDuration > 0 THEN 'play'
                             WHEN d.EpisodeID IS NOT NULL THEN 'download'
                             ELSE 'new'
                         END as action,
                         COALESCE(eh.ListenDate, '1970-01-01 00:00:00') as timestamp
                     FROM Episodes e
+                    JOIN Podcasts p ON e.PodcastID = p.PodcastID AND p.UserID = ?
                     LEFT JOIN UserEpisodeHistory eh ON e.EpisodeID = eh.EpisodeID AND eh.UserID = ?
                     LEFT JOIN DownloadedEpisodes d ON e.EpisodeID = d.EpisodeID AND d.UserID = ?
                     WHERE (eh.UserID = ? OR d.UserID = ?)
@@ -22630,24 +22646,37 @@ impl DatabasePool {
                 .bind(user_id)
                 .bind(user_id)
                 .bind(user_id)
+                .bind(user_id)
                 .bind(since)
                 .fetch_all(pool)
                 .await?;
-                
+
                 let mut actions = Vec::new();
                 for row in rows {
-                    // Handle MySQL DATETIME column 
+                    // Handle MySQL DATETIME column
                     let naive_timestamp: chrono::NaiveDateTime = row.try_get("timestamp")?;
                     let utc_timestamp = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(naive_timestamp, chrono::Utc);
                     let timestamp_str = utc_timestamp.to_rfc3339();
-                    
-                    actions.push(serde_json::json!({
+
+                    let action: String = row.try_get("action")?;
+                    let position: Option<i32> = row.try_get("position").ok().flatten();
+                    let total: Option<i32> = row.try_get("total").ok().flatten();
+
+                    // For play actions, include started, position, and total (required by AntennaPod)
+                    let mut action_json = serde_json::json!({
                         "podcast": row.try_get::<String, _>("podcast")?,
                         "episode": row.try_get::<String, _>("episode")?,
-                        "action": row.try_get::<String, _>("action")?,
+                        "action": action,
                         "timestamp": timestamp_str,
-                        "position": row.try_get::<Option<i32>, _>("position").unwrap_or(None)
-                    }));
+                    });
+
+                    if action == "play" && position.is_some() && total.is_some() {
+                        action_json["started"] = serde_json::json!(0); // Always start from 0
+                        action_json["position"] = serde_json::json!(position.unwrap());
+                        action_json["total"] = serde_json::json!(total.unwrap());
+                    }
+
+                    actions.push(action_json);
                 }
                 Ok(actions)
             }
