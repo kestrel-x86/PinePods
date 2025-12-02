@@ -1,4 +1,4 @@
-use crate::components::audio::on_play_pause;
+use crate::components::audio::on_play_click;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
 use crate::components::gen_components::{on_shownotes_click, EpisodeModal, FallbackImage};
 
@@ -36,9 +36,40 @@ pub struct EpisodeListItemProps {
 
 #[function_component(EpisodeListItem)]
 pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
-    let (app_state, app_dispatch) = use_store::<AppState>();
+    // Use selective subscriptions to only re-render when relevant state changes
+    let episode_id = props.episode.episodeid;
+
+    // Only subscribe to the specific fields we need for RENDERING
+    let is_completed = use_selector(move |state: &AppState| {
+        state.completed_episodes
+            .as_ref()
+            .unwrap_or(&vec![])
+            .contains(&episode_id)
+    });
+    let auth_details = use_selector(|state: &AppState| state.auth_details.clone());
+    let user_details = use_selector(|state: &AppState| state.user_details.clone());
+    let date_format = use_selector(|state: &AppState| state.date_format.clone());
+    let user_tz = use_selector(|state: &AppState| state.user_tz.clone());
+    let hour_preference = use_selector(|state: &AppState| state.hour_preference);
+    let selected_for_deletion = use_selector(move |state: &AppState| {
+        state.selected_episodes_for_deletion.contains(&episode_id)
+    });
+    let podcast_added = use_selector(|state: &AppState| state.podcast_added);
+    let is_downloaded_server = use_selector(move |state: &AppState| {
+        state.downloaded_episodes.is_server_download(episode_id)
+    });
+    let is_downloaded_local = use_selector(move |state: &AppState| {
+        state.downloaded_episodes.is_local_download(episode_id)
+    });
+
+    // We still need the dispatcher for actions
+    let app_dispatch = Dispatch::<AppState>::global();
+
     let (audio_state, audio_dispatch) = use_store::<UIState>();
     let (desc_state, desc_dispatch) = use_store::<ExpandedDescriptions>();
+
+    // DEBUG: Log re-renders to confirm the fix works
+    web_sys::console::log_1(&format!("EpisodeListItem render: {}", props.episode.episodetitle).into());
 
     /*
     Item Shape
@@ -139,36 +170,84 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
     let is_playing = audio_state.audio_playing.unwrap_or(false);
 
     let formatted_pub_date = {
-        let date_format = match_date_format(app_state.date_format.as_deref());
-        let datetime = parse_date(&props.episode.episodepubdate, &app_state.user_tz);
-        format_datetime(&datetime, &app_state.hour_preference, date_format)
+        let date_format = match_date_format(date_format.as_deref());
+        let datetime = parse_date(&props.episode.episodepubdate, &user_tz);
+        format_datetime(&datetime, &hour_preference, date_format)
     };
 
-    let api_key = app_state
-        .auth_details
+    let api_key = auth_details
+        .as_ref()
         .as_ref()
         .map(|ud| ud.api_key.clone().unwrap())
         .unwrap();
-    let user_id = app_state
-        .user_details
+    let user_id = user_details
+        .as_ref()
         .as_ref()
         .map(|ud| ud.UserID.clone())
         .unwrap();
-    let server_name = app_state
-        .auth_details
+    let server_name = auth_details
+        .as_ref()
         .as_ref()
         .map(|ud| ud.server_name.clone())
         .unwrap();
 
-    let on_play_pause = on_play_pause(
-        props.episode.clone(),
-        api_key.clone(),
-        user_id.clone(),
-        server_name.clone(),
-        audio_dispatch.clone(),
-        audio_state.clone(),
-        app_state.clone(),
-    );
+    // Compute is_local inline instead of passing it via app_state
+    let is_local = if podcast_added.unwrap_or(false) && props.episode.episodeid != 0 {
+        *is_downloaded_server || {
+            #[cfg(not(feature = "server_build"))]
+            {
+                *is_downloaded_local
+            }
+            #[cfg(feature = "server_build")]
+            {
+                false
+            }
+        }
+    } else {
+        false
+    };
+
+    // Inline on_play_pause logic to avoid needing app_state
+    let on_play_pause = {
+        let episode = props.episode.clone();
+        let api_key = api_key.clone();
+        let user_id = user_id.clone();
+        let server_name = server_name.clone();
+        let audio_dispatch = audio_dispatch.clone();
+        let audio_state = audio_state.clone();
+        let is_local = is_local;
+
+        Callback::from(move |e: MouseEvent| {
+            let is_current = audio_state
+                .currently_playing
+                .as_ref()
+                .map_or(false, |current| current.episode_id == episode.episodeid);
+            if is_current {
+                audio_dispatch.reduce_mut(|state| {
+                    let currently_playing = state.audio_playing.unwrap_or(false);
+                    state.audio_playing = Some(!currently_playing);
+                    if let Some(audio) = &state.audio_element {
+                        if currently_playing {
+                            let _ = audio.pause();
+                        } else {
+                            let _ = audio.play();
+                        }
+                    }
+                });
+            } else {
+                on_play_click(
+                    episode.clone(),
+                    api_key.clone(),
+                    user_id,
+                    server_name.clone(),
+                    audio_dispatch.clone(),
+                    audio_state.clone(),
+                    is_local,
+                )
+                .emit(e);
+            }
+        })
+    };
 
     /*
     Episode Information
@@ -188,11 +267,7 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
 
     let episode_duration_str = format_time(props.episode.episodeduration);
 
-    let is_completed = app_state
-        .completed_episodes
-        .as_ref()
-        .unwrap_or(&vec![])
-        .contains(&props.episode.episodeid);
+    // is_completed is already defined via use_selector above
 
     let checkbox_ep = props.episode.episodeid;
 
@@ -265,22 +340,13 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
     */
     let browser_history = BrowserHistory::new();
     let on_shownotes_click = {
-        let check_episode_id = props.episode.episodeid;
-        #[cfg(feature = "server_build")]
-        let is_local = app_state
-            .downloaded_episodes
-            .is_local_download(check_episode_id);
-
-        #[cfg(not(feature = "server_build"))]
-        let is_local = app_state
-            .downloaded_episodes
-            .is_local_download(check_episode_id);
+        let is_local_for_shownotes = *is_downloaded_local;
         let src = if props.episode.episodeurl.contains("youtube.com") {
             format!(
                 "{}/api/data/stream/{}?api_key={}&user_id={}&type=youtube",
                 server_name, props.episode.episodeid, api_key, user_id
             )
-        } else if is_local {
+        } else if is_local_for_shownotes {
             format!(
                 "{}/api/data/stream/{}?api_key={}&user_id={}",
                 server_name, props.episode.episodeid, api_key, user_id
@@ -358,7 +424,7 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
                         <div class="flex items-center pl-4">
                             <input
                                 type="checkbox"
-                                checked={app_state.selected_episodes_for_deletion.contains(&props.episode.episodeid)}
+                                checked={*selected_for_deletion}
                                 class="podcast-dropdown-checkbox h-5 w-5 rounded border-2 text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer appearance-none checked:bg-primary checked:border-primary"
                                 onchange={props.on_checkbox_change.reform(move |_| checkbox_ep)}
                             />
@@ -382,7 +448,7 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
                         {props.episode.episodetitle.clone()}
                     </p>
                     {
-                        if is_completed.clone() {
+                        if *is_completed {
                             html! {
                                 <i class="ph ph-check-circle text-2xl text-green-500"></i>
                             }
@@ -420,7 +486,7 @@ pub fn episode_list_item(props: &EpisodeListItemProps) -> Html {
                         </span>
                     </div>
                     {
-                        if is_completed {
+                        if *is_completed {
                             if is_narrow_viewport {
                                 html! {
                                     <div class="flex items-center space-x-2">
