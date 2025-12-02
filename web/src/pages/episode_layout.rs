@@ -1,14 +1,15 @@
-use super::app_drawer::App_drawer;
-use super::gen_components::{FallbackImage, Search_nav, UseScrollToTop};
+use crate::components::app_drawer::App_drawer;
 use crate::components::audio::AudioPlayer;
 use crate::components::click_events::create_on_title_click;
 use crate::components::context::{AppState, UIState};
+use crate::components::gen_components::{FallbackImage, Search_nav, UseScrollToTop};
 use crate::components::gen_funcs::{
     format_error_message, get_default_sort_direction, get_filter_preference, set_filter_preference,
 };
 use crate::components::host_component::HostDropdown;
-use crate::components::podcast_layout::ClickedFeedURL;
-use crate::components::virtual_list::PodcastEpisodeVirtualList;
+use crate::components::loading::Loading;
+use crate::components::virtual_list::VirtualList;
+use crate::pages::podcast_layout::ClickedFeedURL;
 use crate::requests::pod_req::{
     call_add_category, call_add_podcast, call_adjust_skip_times, call_bulk_download_episodes,
     call_bulk_mark_episodes_completed, call_bulk_queue_episodes, call_bulk_save_episodes,
@@ -721,6 +722,7 @@ pub fn episode_layout() -> Html {
                                     server_name,
                                     Some(Some(api_key.clone().unwrap())),
                                     &click_history,
+                                    podcast_details.details.podcastid,
                                     podcast_details.details.podcastindexid,
                                     podcast_details.details.podcastname,
                                     podcast_details.details.feedurl,
@@ -895,7 +897,7 @@ pub fn episode_layout() -> Html {
                                             &server_name,
                                             &api_key.as_ref().unwrap(),
                                             user_id,
-                                            &merged_id,
+                                            merged_id,
                                         )
                                         .await
                                         {
@@ -978,16 +980,19 @@ pub fn episode_layout() -> Html {
                 effect_added.clone(),
             ),
             move |_| {
-                let episode_name: Option<String> = click_state
+                let episode_name = click_state
+                    .podcast_feed_results
+                    .as_ref()
+                    .and_then(|r| r.episodes.get(0))
+                    .and_then(|ep| Some(ep.episodetitle.clone()))
+                    .unwrap_or_default();
+
+                let episode_url = click_state
                     .podcast_feed_results
                     .as_ref()
                     .and_then(|results| results.episodes.get(0))
-                    .and_then(|episode| episode.title.clone());
-                let episode_url: Option<String> = click_state
-                    .podcast_feed_results
-                    .as_ref()
-                    .and_then(|results| results.episodes.get(0))
-                    .and_then(|episode| episode.enclosure_url.clone());
+                    .and_then(|episode| Some(episode.episodeurl.clone()))
+                    .unwrap_or_default();
 
                 let bool_true = *effect_added; // Dereference here
 
@@ -1001,7 +1006,7 @@ pub fn episode_layout() -> Html {
                     let episode_url = episode_url;
                     let user_id = user_id.unwrap();
 
-                    if episode_name.is_some() && episode_url.is_some() {
+                    if !episode_name.is_empty() && !episode_url.is_empty() {
                         wasm_bindgen_futures::spawn_local(async move {
                             if let (Some(api_key), Some(server_name)) =
                                 (api_key.as_ref(), server_name.as_ref())
@@ -1009,8 +1014,8 @@ pub fn episode_layout() -> Html {
                                 match call_get_podcast_id_from_ep_name(
                                     &server_name,
                                     &api_key,
-                                    episode_name.unwrap(),
-                                    episode_url.unwrap(),
+                                    episode_name,
+                                    episode_url,
                                     user_id,
                                 )
                                 .await
@@ -1388,7 +1393,7 @@ pub fn episode_layout() -> Html {
                     .podcast_feed_results
                     .as_ref()
                     .and_then(|results| results.episodes.get(0))
-                    .and_then(|episode| episode.episode_id)
+                    .and_then(|episode| Some(episode.episodeid))
                 {
                     Some(id) => id,
                     None => {
@@ -1400,7 +1405,7 @@ pub fn episode_layout() -> Html {
                     .podcast_feed_results
                     .as_ref()
                     .and_then(|results| results.episodes.get(0))
-                    .and_then(|episode| episode.is_youtube)
+                    .and_then(|episode| Some(episode.is_youtube))
                 {
                     Some(id) => id,
                     None => {
@@ -2707,7 +2712,7 @@ pub fn episode_layout() -> Html {
                                                                                                         server_name,
                                                                                                         api_key.as_deref().unwrap(),
                                                                                                         *user_id,
-                                                                                                        &id,
+                                                                                                        id,
                                                                                                     ).await {
                                                                                                         details_map.insert(id, details);
                                                                                                     }
@@ -2810,7 +2815,7 @@ pub fn episode_layout() -> Html {
                                                                                     &server_name,
                                                                                     api_key.as_deref().unwrap(),
                                                                                     user_id,
-                                                                                    &merged_id,
+                                                                                    merged_id,
                                                                                 ).await {
                                                                                     details_map.insert(merged_id, details);
                                                                                 }
@@ -2948,7 +2953,7 @@ pub fn episode_layout() -> Html {
                                                         let podcast_index_id = if (*edit_podcast_index_id).trim().is_empty() || *edit_podcast_index_id == current_podcast_index_id {
                                                             None
                                                         } else {
-                                                            (*edit_podcast_index_id).parse::<i64>().ok()
+                                                            (*edit_podcast_index_id).parse::<i32>().ok()
                                                         };
 
                                                         // Check if any changes were made
@@ -3060,7 +3065,7 @@ pub fn episode_layout() -> Html {
                 let i18n_podcast_successfully_added = i18n_podcast_successfully_added.clone();
                 let i18n_failed_to_add_podcast = i18n_failed_to_add_podcast.clone();
                 let callback_podcast_id = added_id.clone();
-                let podcast_id_og = Some(pod_values.clone().unwrap().podcastid.clone());
+                let podcast_id_og = pod_values.clone().unwrap().podcastid.clone();
                 let pod_title_og = pod_values.clone().unwrap().podcastname.clone();
                 let pod_artwork_og = pod_values.clone().unwrap().artworkurl.clone();
                 let pod_author_og = pod_values.clone().unwrap().author.clone();
@@ -3212,23 +3217,25 @@ pub fn episode_layout() -> Html {
                     .filter(|episode| {
                         // Search filter
                         let matches_search = if !search.is_empty() {
-                            episode.title.as_ref().map_or(false, |title| {
-                                title.to_lowercase().contains(&search.to_lowercase())
-                            }) || episode.description.as_ref().map_or(false, |desc| {
-                                desc.to_lowercase().contains(&search.to_lowercase())
-                            })
+                            episode
+                                .episodetitle
+                                .to_lowercase()
+                                .contains(&search.to_lowercase())
+                                || episode
+                                    .episodedescription
+                                    .to_lowercase()
+                                    .contains(&search.to_lowercase())
                         } else {
                             true
                         };
 
                         // Status filter
                         let matches_status = if **show_in_progress {
-                            !episode.completed.unwrap_or(false)
-                                && episode.listen_duration.unwrap_or(0) > 0
+                            !episode.completed && episode.listenduration > 0
                         } else {
                             match *completed_filter_state {
-                                CompletedFilter::ShowOnly => episode.completed.unwrap_or(false),
-                                CompletedFilter::Hide => !episode.completed.unwrap_or(false),
+                                CompletedFilter::ShowOnly => episode.completed,
+                                CompletedFilter::Hide => !episode.completed,
                                 CompletedFilter::ShowAll => true,
                             }
                         };
@@ -3241,12 +3248,20 @@ pub fn episode_layout() -> Html {
                 // Sort logic
                 if let Some(direction) = (*sort_dir).as_ref() {
                     filtered.sort_by(|a, b| match direction {
-                        EpisodeSortDirection::NewestFirst => b.pub_date.cmp(&a.pub_date),
-                        EpisodeSortDirection::OldestFirst => a.pub_date.cmp(&b.pub_date),
-                        EpisodeSortDirection::ShortestFirst => a.duration.cmp(&b.duration),
-                        EpisodeSortDirection::LongestFirst => b.duration.cmp(&a.duration),
-                        EpisodeSortDirection::TitleAZ => a.title.cmp(&b.title),
-                        EpisodeSortDirection::TitleZA => b.title.cmp(&a.title),
+                        EpisodeSortDirection::NewestFirst => {
+                            b.episodepubdate.cmp(&a.episodepubdate)
+                        }
+                        EpisodeSortDirection::OldestFirst => {
+                            a.episodepubdate.cmp(&b.episodepubdate)
+                        }
+                        EpisodeSortDirection::ShortestFirst => {
+                            a.episodepubdate.cmp(&b.episodepubdate)
+                        }
+                        EpisodeSortDirection::LongestFirst => {
+                            b.episodepubdate.cmp(&a.episodepubdate)
+                        }
+                        EpisodeSortDirection::TitleAZ => a.episodetitle.cmp(&b.episodetitle),
+                        EpisodeSortDirection::TitleZA => b.episodetitle.cmp(&a.episodetitle),
                     });
                 }
                 filtered
@@ -3291,16 +3306,7 @@ pub fn episode_layout() -> Html {
                 }
                 {
                     if *loading { // If loading is true, display the loading animation
-                        html! {
-                            <div class="loading-animation">
-                                <div class="frame1"></div>
-                                <div class="frame2"></div>
-                                <div class="frame3"></div>
-                                <div class="frame4"></div>
-                                <div class="frame5"></div>
-                                <div class="frame6"></div>
-                            </div>
-                        }
+                        html! { <Loading/> }
                     } else {
                         html! {
                             <>
@@ -3865,7 +3871,7 @@ pub fn episode_layout() -> Html {
             let selected_episodes = selected_episodes_clone.clone();
             Callback::from(move |_| {
                 let all_ids: HashSet<i32> = filtered_episodes.iter()
-                    .filter_map(|ep| ep.episode_id)
+                    .map(|ep| ep.episodeid)
                     .collect();
 
                 let current = (*selected_episodes).clone();
@@ -3884,7 +3890,7 @@ pub fn episode_layout() -> Html {
             {
                 // this extra block is an expression, so valid
                 let all_ids: HashSet<i32> = filtered_episodes_clone.iter()
-                    .filter_map(|ep| ep.episode_id)
+                    .map(|ep| ep.episodeid)
                     .collect();
                 let current = (*selected_episodes_clone).clone();
                 if current.len() == all_ids.len() && all_ids.iter().all(|id| current.contains(id)) {
@@ -3904,8 +3910,8 @@ pub fn episode_layout() -> Html {
                                                                     let selected_episodes = selected_episodes_clone.clone();
                                                                     Callback::from(move |_| {
                                                                         let unplayed_ids: HashSet<i32> = filtered_episodes.iter()
-                                                                            .filter(|ep| !ep.completed.unwrap_or(false))
-                                                                            .filter_map(|ep| ep.episode_id)
+                                                                            .filter(|ep| !ep.completed)
+                                                                            .map(|ep| ep.episodeid)
                                                                             .collect();
                                                                         selected_episodes.set(unplayed_ids);
                                                                     })
@@ -4152,12 +4158,12 @@ pub fn episode_layout() -> Html {
                                         let selected_episodes_older = selected_episodes.clone();
                                         let on_select_older = Callback::from(move |cutoff_episode_id: i32| {
                                             let cutoff_index = filtered_episodes_older.iter()
-                                                .position(|ep| ep.episode_id == Some(cutoff_episode_id))
+                                                .position(|ep| ep.episodeid == cutoff_episode_id)
                                                 .unwrap_or(0);
 
                                             let older_ids: HashSet<i32> = filtered_episodes_older.iter()
                                                 .skip(cutoff_index) // Include the cutoff episode and all after it (older in reverse chronological order)
-                                                .filter_map(|ep| ep.episode_id)
+                                                .map(|ep| ep.episodeid)
                                                 .collect();
 
                                             selected_episodes_older.set({
@@ -4172,12 +4178,12 @@ pub fn episode_layout() -> Html {
                                         let selected_episodes_newer = selected_episodes.clone();
                                         let on_select_newer = Callback::from(move |cutoff_episode_id: i32| {
                                             let cutoff_index = filtered_episodes_newer.iter()
-                                                .position(|ep| ep.episode_id == Some(cutoff_episode_id))
+                                                .position(|ep| ep.episodeid == cutoff_episode_id)
                                                 .unwrap_or(0);
 
                                             let newer_ids: HashSet<i32> = filtered_episodes_newer.iter()
                                                 .take(cutoff_index + 1) // Include episodes before the cutoff (newer in reverse chronological order)
-                                                .filter_map(|ep| ep.episode_id)
+                                                .map(|ep| ep.episodeid)
                                                 .collect();
 
                                             selected_episodes_newer.set({
@@ -4188,28 +4194,10 @@ pub fn episode_layout() -> Html {
                                         });
 
                                         html! {
-                                            <PodcastEpisodeVirtualList
-                                                episodes={(*filtered_episodes).clone()}
-                                                item_height={220.0} // Adjust this based on your actual episode item height
-                                                podcast_added={podcast_added}
-                                                search_state={search_state.clone()}
-                                                search_ui_state={state.clone()}
-                                                dispatch={_dispatch.clone()}
-                                                search_dispatch={_search_dispatch.clone()}
-                                                history={history.clone()}
-                                                server_name={server_name.clone()}
-                                                user_id={user_id}
-                                                api_key={api_key.clone()}
-                                                podcast_link={podcast_link_clone}
-                                                podcast_title={podcast_title}
-                                                selected_episodes={Some(Rc::new((*selected_episodes).clone()))}
-                                                is_selecting={Some(*is_selecting)}
-                                                on_episode_select={Some(on_episode_select)}
-                                                on_select_older={Some(on_select_older)}
-                                                on_select_newer={Some(on_select_newer)}
+                                            <VirtualList
+                                                episodes={ (*filtered_episodes).clone() }
                                             />
                                         }
-
                                     } else {
                                         html! {
                                             <div class="empty-episodes-container" id="episode-container">
@@ -4227,7 +4215,23 @@ pub fn episode_layout() -> Html {
             <App_drawer />
             {
                 if let Some(audio_props) = &state.currently_playing {
-                    html! { <AudioPlayer src={audio_props.src.clone()} title={audio_props.title.clone()} description={audio_props.description.clone()} release_date={audio_props.release_date.clone()} artwork_url={audio_props.artwork_url.clone()} duration={audio_props.duration.clone()} episode_id={audio_props.episode_id.clone()} duration_sec={audio_props.duration_sec.clone()} start_pos_sec={audio_props.start_pos_sec.clone()} end_pos_sec={audio_props.end_pos_sec.clone()} offline={audio_props.offline.clone()} is_youtube={audio_props.is_youtube.clone()} /> }
+                    html! {
+                        <AudioPlayer
+                            episode={audio_props.episode.clone()}
+                            src={audio_props.src.clone()}
+                            title={audio_props.title.clone()}
+                            description={audio_props.description.clone()}
+                            release_date={audio_props.release_date.clone()}
+                            artwork_url={audio_props.artwork_url.clone()}
+                            duration={audio_props.duration.clone()}
+                            episode_id={audio_props.episode_id.clone()}
+                            duration_sec={audio_props.duration_sec.clone()}
+                            start_pos_sec={audio_props.start_pos_sec.clone()}
+                            end_pos_sec={audio_props.end_pos_sec.clone()}
+                            offline={audio_props.offline.clone()}
+                            is_youtube={audio_props.is_youtube.clone()}
+                        />
+                    }
                 } else {
                     html! {}
                 }

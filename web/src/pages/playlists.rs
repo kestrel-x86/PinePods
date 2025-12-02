@@ -1,5 +1,6 @@
-use super::app_drawer::App_drawer;
-use super::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
+use crate::components::loading::Loading;
+use crate::components::app_drawer::App_drawer;
+use crate::components::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState};
 use crate::components::gen_funcs::format_error_message;
@@ -1124,15 +1125,7 @@ pub fn playlists() -> Html {
                                 <label class="block mb-2 text-sm font-medium">{&i18n.t("playlists.filter_by_podcasts")}</label>
                                 {
                                     if *loading_podcasts {
-                                        html! {
-                                            <div class="flex justify-center p-4">
-                                                <div class="loading-animation">
-                                                    <div class="frame1"></div>
-                                                    <div class="frame2"></div>
-                                                    <div class="frame3"></div>
-                                                </div>
-                                            </div>
-                                        }
+                                        html! { <Loading/> }
                                     } else {
                                         html! {
                                             <PodcastSelector
@@ -1581,16 +1574,7 @@ pub fn playlists() -> Html {
                             }
                         }
                     } else {
-                        html! {
-                            <div class="loading-animation">
-                                <div class="frame1"></div>
-                                <div class="frame2"></div>
-                                <div class="frame3"></div>
-                                <div class="frame4"></div>
-                                <div class="frame5"></div>
-                                <div class="frame6"></div>
-                            </div>
-                        }
+                        html! { <Loading/> }
                     }
                 }
 
@@ -1607,6 +1591,7 @@ pub fn playlists() -> Html {
                 // Audio player if something is playing
                 if let Some(audio_props) = &audio_state.currently_playing {
                     <AudioPlayer
+                        episode={audio_props.episode.clone()}
                         src={audio_props.src.clone()}
                         title={audio_props.title.clone()}
                         description={audio_props.description.clone()}

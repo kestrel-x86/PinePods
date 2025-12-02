@@ -1,4 +1,4 @@
-use super::gen_components::LoadingModal;
+use crate::components::gen_components::LoadingModal;
 use crate::components::context::AppState;
 use crate::requests::people_req::{
     call_get_person_subscriptions, call_subscribe_to_person, call_unsubscribe_from_person,
@@ -39,7 +39,7 @@ pub struct HostDropdownProps {
     pub hosts: Vec<Person>,
     pub podcast_feed_url: String, // Add this to help create a unique identifier
     pub podcast_id: i32,
-    pub podcast_index_id: i64,
+    pub podcast_index_id: i32,
 }
 
 #[allow(dead_code)]
@@ -55,7 +55,7 @@ fn map_podcast_details_to_podcast(details: PodcastDetails) -> Podcast {
         author: Some(details.author),
         categories: Some(details.categories),
         explicit: details.explicit,
-        podcastindexid: Some(details.podcastindexid.unwrap_or(0)),
+        podcastindexid: details.podcastindexid,
     }
 }
 
@@ -301,8 +301,11 @@ pub fn host_dropdown(
                                 .items
                                 .iter()
                                 .filter_map(|item| {
-                                    let key =
-                                        (item.feedTitle.clone(), item.feedUrl.clone(), item.feedId);
+                                    let key = (
+                                        item.podcastname.clone(),
+                                        item.feedurl.clone(),
+                                        item.podcastid,
+                                    );
                                     if processed_feeds.insert(key.clone()) {
                                         Some(key)
                                     } else {
@@ -321,11 +324,8 @@ pub fn host_dropdown(
                             {
                                 // Add podpeople podcasts to unique_feeds if they don't already exist
                                 for podcast in podpeople_results.podcasts {
-                                    let key = (
-                                        Some(podcast.podcastname),
-                                        Some(podcast.feedurl),
-                                        Some(podcast.podcastid as i64),
-                                    );
+                                    let key =
+                                        (podcast.podcastname, podcast.feedurl, podcast.podcastid);
                                     if processed_feeds.insert(key.clone()) {
                                         unique_feeds.insert(key);
                                     }
@@ -339,15 +339,15 @@ pub fn host_dropdown(
                                     let api_key = api_key.clone();
                                     let user_id = user_id;
                                     let search_state = search_state.clone();
-                                    let podcast_index_id = feed_id.unwrap_or(0);
+                                    let podcast_index_id = feed_id;
 
                                     async move {
                                         let podcast_exists = call_check_podcast(
                                             &server_name.clone().unwrap(),
                                             &api_key.clone().unwrap().unwrap(),
                                             user_id.unwrap(),
-                                            &feed_title.clone().unwrap_or_default(),
-                                            &feed_url.clone().unwrap_or_default(),
+                                            &feed_title.clone(),
+                                            &feed_url.clone(),
                                         )
                                         .await
                                         .unwrap_or_default()
@@ -358,8 +358,8 @@ pub fn host_dropdown(
                                                 &server_name.clone().unwrap(),
                                                 &api_key.clone().unwrap(),
                                                 &search_state.user_details.as_ref().unwrap().UserID,
-                                                &feed_url.unwrap_or_default(),
-                                                &feed_title.clone().unwrap_or_default(),
+                                                &feed_url,
+                                                &feed_title.clone(),
                                             )
                                             .await
                                             {
@@ -372,7 +372,7 @@ pub fn host_dropdown(
                                                             .as_ref()
                                                             .unwrap()
                                                             .UserID,
-                                                        &podcast_id,
+                                                        podcast_id,
                                                     )
                                                     .await
                                                 {
@@ -390,8 +390,8 @@ pub fn host_dropdown(
                                                 &server_name.clone().unwrap(),
                                                 &api_key.clone().unwrap().unwrap(),
                                                 user_id.unwrap(),
-                                                &feed_title.clone().unwrap_or_default(),
-                                                &feed_url.clone().unwrap_or_default(),
+                                                &feed_title.clone(),
+                                                &feed_url.clone(),
                                                 podcast_index_id,
                                                 false,
                                                 Some(true),
@@ -415,7 +415,7 @@ pub fn host_dropdown(
                                                         author: Some(details.author), // Changed from podcast_author
                                                         categories: details.categories,
                                                         explicit: details.explicit, // Changed from podcast_explicit
-                                                        podcastindexid: Some(details.podcastindexid), // Changed from podcast_index_id
+                                                        podcastindexid: details.podcastindexid, // Changed from podcast_index_id
                                                     })
                                                 }
                                                 Err(e) => {
@@ -423,8 +423,8 @@ pub fn host_dropdown(
                                                         &format!(
                                                             "Dynamic fetch error details: {:?}\nFor podcast: {} - {}",
                                                             e,
-                                                            feed_title.clone().unwrap_or_default(),
-                                                            feed_url.clone().unwrap_or_default()
+                                                            feed_title.clone(),
+                                                            feed_url.clone()
                                                         )
                                                         .into(),
                                                     );

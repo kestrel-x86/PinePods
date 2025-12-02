@@ -1,5 +1,4 @@
-use super::app_drawer::App_drawer;
-use super::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
+use crate::components::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, PodcastState, UIState};
 use crate::components::gen_funcs::format_error_message;
@@ -9,6 +8,7 @@ use crate::requests::pod_req::{
     RemovePodcastValuesName,
 };
 use crate::requests::search_pods::{call_parse_podcast_url, UnifiedPodcast};
+use crate::components::app_drawer::App_drawer;
 use gloo::events::EventListener;
 use i18nrs::yew::use_translation;
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,7 @@ use yewdux::use_store;
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct ClickedFeedURL {
-    pub podcastid: i64,
+    pub podcastid: i32,
     pub podcastname: String,
     pub feedurl: String,
     pub description: String,
@@ -31,7 +31,7 @@ pub struct ClickedFeedURL {
     pub episodecount: i32,
     pub categories: Option<HashMap<String, String>>,
     pub websiteurl: String,
-    pub podcastindexid: i64,
+    pub podcastindexid: i32,
     pub is_youtube: Option<bool>,
 }
 
@@ -49,7 +49,7 @@ impl ClickedFeedURL {
             websiteurl: self.websiteurl,
             explicit: self.explicit,
             userid: 0, // Default value since it's not in ClickedFeedURL
-            podcastindexid: Some(self.podcastindexid),
+            podcastindexid: self.podcastindexid,
             is_youtube: self.is_youtube.unwrap_or(false),
         }
     }
@@ -156,7 +156,23 @@ pub fn pod_layout() -> Html {
             </div>
             {
                 if let Some(audio_props) = &audio_state.currently_playing {
-                    html! { <AudioPlayer src={audio_props.src.clone()} title={audio_props.title.clone()} description={audio_props.description.clone()} release_date={audio_props.release_date.clone()} artwork_url={audio_props.artwork_url.clone()} duration={audio_props.duration.clone()} episode_id={audio_props.episode_id.clone()} duration_sec={audio_props.duration_sec.clone()} start_pos_sec={audio_props.start_pos_sec.clone()} end_pos_sec={audio_props.end_pos_sec.clone()} offline={audio_props.offline.clone()} is_youtube={audio_props.is_youtube.clone()} /> }
+                    html! {
+                        <AudioPlayer
+                            episode={audio_props.episode.clone()}
+                            src={audio_props.src.clone()}
+                            title={audio_props.title.clone()}
+                            description={audio_props.description.clone()}
+                            release_date={audio_props.release_date.clone()}
+                            artwork_url={audio_props.artwork_url.clone()}
+                            duration={audio_props.duration.clone()}
+                            episode_id={audio_props.episode_id.clone()}
+                            duration_sec={audio_props.duration_sec.clone()}
+                            start_pos_sec={audio_props.start_pos_sec.clone()}
+                            end_pos_sec={audio_props.end_pos_sec.clone()}
+                            offline={audio_props.offline.clone()}
+                            is_youtube={audio_props.is_youtube.clone()}
+                        />
+                    }
                 } else {
                     html! {}
                 }
@@ -194,7 +210,7 @@ pub fn podcast_item(props: &PodcastProps) -> Html {
     let remove_error_msg = i18n.t("podcast_layout.remove_error");
     let podcast_added_msg = i18n.t("podcast_layout.podcast_added");
     let add_error_msg = i18n.t("podcast_layout.add_error");
-    
+
     // Pre-capture UI strings
     let show_less_text = i18n.t("podcast_layout.show_less");
     let show_more_text = i18n.t("podcast_layout.show_more");
@@ -290,8 +306,7 @@ pub fn podcast_item(props: &PodcastProps) -> Html {
                                 state.added_podcast_urls.remove(&podcast_url);
                             });
                             dispatch.reduce_mut(|state| {
-                                state.info_message =
-                                    Some(podcast_removed_msg);
+                                state.info_message = Some(podcast_removed_msg);
                             });
                         }
                         Err(e) => {
@@ -326,7 +341,7 @@ pub fn podcast_item(props: &PodcastProps) -> Html {
                         &api_key.unwrap(),
                         user_id.unwrap(),
                         &podcast_values,
-                        Some(podcast.id),
+                        podcast.id,
                     )
                     .await
                     {
@@ -421,8 +436,8 @@ pub fn podcast_item(props: &PodcastProps) -> Html {
                         dispatch.reduce_mut(|state| state.is_loading = Some(false));
                         history.push("/episode_layout"); // Navigate to episode_layout
                     }
-                    Err(_e) => {
-                        // web_sys::console::log_1(&format!("Error: {}", e).into());
+                    Err(e) => {
+                        web_sys::console::log_1(&format!("Error: {}", e).into());
                     }
                 }
             });

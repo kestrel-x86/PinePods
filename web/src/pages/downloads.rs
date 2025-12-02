@@ -1,30 +1,28 @@
-use super::app_drawer::App_drawer;
-use super::gen_components::{
-    download_episode_item, empty_message, on_shownotes_click, FallbackImage, Search_nav,
-    UseScrollToTop,
-};
-use crate::components::audio::on_play_pause;
+use crate::components::app_drawer::App_drawer;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, ExpandedDescriptions, UIState};
-use crate::components::gen_funcs::{
-    format_datetime, match_date_format, parse_date, sanitize_html_with_blank_target,
-};
+use crate::components::context_menu_button::PageType;
+use crate::components::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
+use crate::components::loading::Loading;
+
+use crate::components::episode_list_item::EpisodeListItem;
+use crate::requests::episode::Episode;
 use crate::requests::pod_req::{
     call_bulk_delete_downloaded_episodes, call_get_episode_downloads, call_get_podcasts,
-    BulkEpisodeActionRequest, EpisodeDownload, EpisodeDownloadResponse, Podcast, PodcastResponse,
+    BulkEpisodeActionRequest, EpisodeDownloadResponse, Podcast, PodcastResponse,
 };
+
 use i18nrs::yew::use_translation;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::rc::Rc;
-use wasm_bindgen::prelude::wasm_bindgen;
 use yew::prelude::*;
 use yew::{function_component, html, Html};
 use yew_router::history::BrowserHistory;
 use yewdux::prelude::*;
 
-fn group_episodes_by_podcast(episodes: Vec<EpisodeDownload>) -> HashMap<i32, Vec<EpisodeDownload>> {
-    let mut grouped: HashMap<i32, Vec<EpisodeDownload>> = HashMap::new();
+fn group_episodes_by_podcast(episodes: Vec<Episode>) -> HashMap<i32, Vec<Episode>> {
+    let mut grouped: HashMap<i32, Vec<Episode>> = HashMap::new();
     for episode in episodes {
         grouped
             .entry(episode.podcastid)
@@ -66,7 +64,7 @@ pub fn downloads() -> Html {
     let show_in_progress = use_state(|| false);
     let show_clonedal = show_modal.clone();
     let show_clonedal2 = show_modal.clone();
-    let on_modal_open = Callback::from(move |_: MouseEvent| show_clonedal.set(true));
+    let on_modal_open = Callback::from(move |_: i32| show_clonedal.set(true));
 
     let on_modal_close = Callback::from(move |_: MouseEvent| show_clonedal2.set(false));
 
@@ -127,16 +125,17 @@ pub fn downloads() -> Html {
                         }
 
                         match call_get_episode_downloads(&server_name, &api_key, &user_id).await {
-                            Ok(fetched_episodes) => {
+                            Ok(mut fetched_episodes) => {
                                 let completed_episode_ids: Vec<i32> = fetched_episodes
                                     .iter()
                                     .filter(|ep| ep.completed)
                                     .map(|ep| ep.episodeid)
                                     .collect();
                                 dispatch.reduce_mut(move |state| {
-                                    state.downloaded_episodes = Some(EpisodeDownloadResponse {
-                                        episodes: fetched_episodes,
-                                    });
+                                    state.downloaded_episodes.clear();
+                                    for ep in fetched_episodes.drain(..) {
+                                        state.downloaded_episodes.push_server(ep);
+                                    }
                                     state.completed_episodes = Some(completed_episode_ids);
                                 });
 
@@ -145,13 +144,14 @@ pub fn downloads() -> Html {
                                 {
                                     let dispatch_local = dispatch.clone();
                                     wasm_bindgen_futures::spawn_local(async move {
-                                        if let Ok(local_episodes) = crate::components::downloads_tauri::fetch_local_episodes().await {
-                                            let local_episode_ids: Vec<i32> = local_episodes
-                                                .iter()
-                                                .map(|ep| ep.episodeid)
-                                                .collect();
+                                        if let Ok(mut local_episodes) =
+                                            crate::pages::downloads_tauri::fetch_local_episodes()
+                                                .await
+                                        {
                                             dispatch_local.reduce_mut(move |state| {
-                                                state.locally_downloaded_episodes = Some(local_episode_ids);
+                                                for ep in local_episodes.drain(..) {
+                                                    state.downloaded_episodes.push_local(ep);
+                                                }
                                             });
                                         }
                                     });
@@ -224,19 +224,19 @@ pub fn downloads() -> Html {
             let user_id_cloned = user_id.unwrap();
 
             dispatch.reduce_mut(move |state| {
-                let selected_episodes: Vec<i32> = state
+                let selected_episode_ids: Vec<i32> = state
                     .selected_episodes_for_deletion
                     .iter()
                     .cloned()
                     .collect();
-                let is_youtube = state.selected_is_youtube.unwrap_or(false);
+                let is_youtube = state.selected_is_youtube;
 
                 // Clear the selected episodes for deletion right away to prevent re-deletion
                 state.selected_episodes_for_deletion.clear();
 
-                if !selected_episodes.is_empty() {
+                if !selected_episode_ids.is_empty() {
                     let bulk_request = BulkEpisodeActionRequest {
-                        episode_ids: selected_episodes.clone(),
+                        episode_ids: selected_episode_ids.clone(),
                         user_id: user_id_cloned,
                         is_youtube: Some(is_youtube),
                     };
@@ -252,14 +252,10 @@ pub fn downloads() -> Html {
                         {
                             Ok(success_message) => {
                                 dispatch_for_future.reduce_mut(|state| {
-                                    // Remove deleted episodes from the state
-                                    if let Some(downloaded_episodes) =
-                                        &mut state.downloaded_episodes
-                                    {
-                                        downloaded_episodes.episodes.retain(|ep| {
-                                            !selected_episodes.contains(&ep.episodeid)
-                                        });
+                                    for id in selected_episode_ids {
+                                        state.downloaded_episodes.remove_server(id);
                                     }
+
                                     state.info_message = Some(success_message);
                                 });
                             }
@@ -298,16 +294,7 @@ pub fn downloads() -> Html {
             <UseScrollToTop />
                 if *loading { // If loading is true, display the loading animation
                     {
-                        html! {
-                            <div class="loading-animation">
-                                <div class="frame1"></div>
-                                <div class="frame2"></div>
-                                <div class="frame3"></div>
-                                <div class="frame4"></div>
-                                <div class="frame5"></div>
-                                <div class="frame6"></div>
-                            </div>
-                        }
+                        html! { <Loading/> }
                     }
                 } else {
                     {
@@ -437,103 +424,92 @@ pub fn downloads() -> Html {
                     }
 
                     {
-                    if let Some(download_eps) = state.downloaded_episodes.clone() {
-                        let int_download_eps = download_eps.clone();
+                        if state.downloaded_episodes.len() > 0 {
                             let render_state = post_state.clone();
                             let dispatch_cloned = dispatch.clone();
 
-                            if int_download_eps.episodes.is_empty() {
-                                // Render "No Recent Episodes Found" if episodes list is empty
-                                empty_message(
-                                    &i18n_no_downloaded_episodes_found,
-                                    &i18n_no_downloaded_episodes_description
-                                )
-                            } else {
-                                let grouped_episodes = group_episodes_by_podcast(int_download_eps.episodes);
+                            let grouped_episodes = group_episodes_by_podcast(state.downloaded_episodes.episodes().map(|e| e.clone()).collect());
 
-                                // Create filtered episodes
-                                let filtered_grouped_episodes = {
-                                    let mut filtered_map: HashMap<i32, Vec<EpisodeDownload>> = HashMap::new();
+                            // Create filtered episodes
+                            let filtered_grouped_episodes = {
+                                let mut filtered_map: HashMap<i32, Vec<Episode>> = HashMap::new();
 
-                                    for (podcast_id, episodes) in grouped_episodes.iter() {
-                                        let filtered_episodes: Vec<EpisodeDownload> = episodes.iter()
-                                            .filter(|episode| {
-                                                // Search filter
-                                                let matches_search = if !episode_search_term.is_empty() {
-                                                    episode.episodetitle.to_lowercase().contains(&episode_search_term.to_lowercase())
-                                                } else {
-                                                    true
-                                                };
-
-                                                // Completion filter
-                                                let matches_completion = if *show_completed && *show_in_progress {
-                                                    true // Both filters active = show all
-                                                } else if *show_completed {
-                                                    episode.completed
-                                                } else if *show_in_progress {
-                                                    !episode.completed && episode.listenduration.is_some() && episode.listenduration.unwrap() > 0
-                                                } else {
-                                                    true // No filters = show all
-                                                };
-
-                                                matches_search && matches_completion
-                                            })
-                                            .cloned()
-                                            .collect();
-
-                                        if !filtered_episodes.is_empty() {
-                                            filtered_map.insert(*podcast_id, filtered_episodes);
-                                        }
-                                    }
-
-                                    filtered_map
-                                };
-
-                                html! {
-                                    <>
-                                        { for state.podcast_feed_return.as_ref().unwrap().pods.as_ref().unwrap().iter().filter_map(|podcast| {
-                                            let episodes = filtered_grouped_episodes.get(&podcast.podcastid).unwrap_or(&Vec::new()).clone();
-                                            if episodes.is_empty() {
-                                                None
+                                for (podcast_id, episodes) in grouped_episodes.iter() {
+                                    let filtered_episodes: Vec<Episode> = episodes.iter()
+                                        .filter(|episode| {
+                                            // Search filter
+                                            let matches_search = if !episode_search_term.is_empty() {
+                                                episode.episodetitle.to_lowercase().contains(&episode_search_term.to_lowercase())
                                             } else {
-                                                let downloaded_episode_count = episodes.len();
-                                                let is_expanded = *expanded_state.get(&podcast.podcastid).unwrap_or(&false);
-                                                let toggle_expanded_closure = {
-                                                    let podcast_id = podcast.podcastid;
-                                                    toggle_pod_expanded.reform(move |_| podcast_id)
-                                                };
+                                                true
+                                            };
 
-                                                let render_state_cloned = render_state.clone();
-                                                let dispatch_cloned_cloned = dispatch_cloned.clone();
-                                                let audio_state_cloned = audio_state.clone();
-                                                let audio_dispatch_cloned = audio_dispatch.clone();
-                                                let on_checkbox_change_cloned = on_checkbox_change.clone();
+                                            // Completion filter
+                                            let matches_completion = if *show_completed && *show_in_progress {
+                                                true // Both filters active = show all
+                                            } else if *show_completed {
+                                                episode.completed
+                                            } else if *show_in_progress {
+                                                !episode.completed && episode.listenduration > 0
+                                            } else {
+                                                true // No filters = show all
+                                            };
 
-                                                Some(render_podcast_with_episodes(
-                                                    podcast,
-                                                    episodes,
-                                                    downloaded_episode_count,
-                                                    is_expanded,
-                                                    toggle_expanded_closure,
-                                                    render_state_cloned,
-                                                    dispatch_cloned_cloned,
-                                                    is_delete_mode,
-                                                    audio_state_cloned,
-                                                    desc_state.clone(),
-                                                    desc_dispatch.clone(),
-                                                    audio_dispatch_cloned,
-                                                    on_checkbox_change_cloned,
-                                                    *show_modal,
-                                                    on_modal_open.clone(),
-                                                    on_modal_close.clone(),
-                                                ))
-                                            }
-                                        }) }
-                                    </>
+                                            matches_search && matches_completion
+                                        })
+                                        .cloned()
+                                        .collect();
+
+                                    if !filtered_episodes.is_empty() {
+                                        filtered_map.insert(*podcast_id, filtered_episodes);
+                                    }
                                 }
 
-                            }
+                                filtered_map
+                            };
 
+                            html! {
+                                <>
+                                    { for state.podcast_feed_return.as_ref().unwrap().pods.as_ref().unwrap().iter().filter_map(|podcast| {
+                                        let episodes = filtered_grouped_episodes.get(&podcast.podcastid).unwrap_or(&Vec::new()).clone();
+                                        if episodes.is_empty() {
+                                            None
+                                        } else {
+                                            let downloaded_episode_count = episodes.len();
+                                            let is_expanded = *expanded_state.get(&podcast.podcastid).unwrap_or(&false);
+                                            let toggle_expanded_closure = {
+                                                let podcast_id = podcast.podcastid;
+                                                toggle_pod_expanded.reform(move |_| podcast_id)
+                                            };
+
+                                            let render_state_cloned = render_state.clone();
+                                            let dispatch_cloned_cloned = dispatch_cloned.clone();
+                                            let audio_state_cloned = audio_state.clone();
+                                            let audio_dispatch_cloned = audio_dispatch.clone();
+                                            let on_checkbox_change_cloned = on_checkbox_change.clone();
+
+                                            Some(render_podcast_with_episodes(
+                                                podcast,
+                                                episodes,
+                                                downloaded_episode_count,
+                                                is_expanded,
+                                                toggle_expanded_closure,
+                                                render_state_cloned,
+                                                dispatch_cloned_cloned,
+                                                is_delete_mode,
+                                                audio_state_cloned,
+                                                desc_state.clone(),
+                                                desc_dispatch.clone(),
+                                                audio_dispatch_cloned,
+                                                on_checkbox_change_cloned,
+                                                *show_modal,
+                                                on_modal_open.clone(),
+                                                on_modal_close.clone(),
+                                            ))
+                                        }
+                                    }) }
+                                </>
+                            }
 
                         } else {
                             empty_message(
@@ -542,10 +518,27 @@ pub fn downloads() -> Html {
                             )
                         }
                     }
-            }
+
+                }
         {
             if let Some(audio_props) = &audio_state.currently_playing {
-                html! { <AudioPlayer src={audio_props.src.clone()} title={audio_props.title.clone()} description={audio_props.description.clone()} release_date={audio_props.release_date.clone()} artwork_url={audio_props.artwork_url.clone()} duration={audio_props.duration.clone()} episode_id={audio_props.episode_id.clone()} duration_sec={audio_props.duration_sec.clone()} start_pos_sec={audio_props.start_pos_sec.clone()} end_pos_sec={audio_props.end_pos_sec.clone()} offline={audio_props.offline.clone()} is_youtube={audio_props.is_youtube.clone()} /> }
+                html! {
+                    <AudioPlayer
+                        episode={audio_props.episode.clone()}
+                        src={audio_props.src.clone()}
+                        title={audio_props.title.clone()}
+                        description={audio_props.description.clone()}
+                        release_date={audio_props.release_date.clone()}
+                        artwork_url={audio_props.artwork_url.clone()}
+                        duration={audio_props.duration.clone()}
+                        episode_id={audio_props.episode_id.clone()}
+                        duration_sec={audio_props.duration_sec.clone()}
+                        start_pos_sec={audio_props.start_pos_sec.clone()}
+                        end_pos_sec={audio_props.end_pos_sec.clone()}
+                        offline={audio_props.offline.clone()}
+                        is_youtube={audio_props.is_youtube.clone()}
+                    />
+                }
             } else {
                 html! {}
             }
@@ -558,7 +551,7 @@ pub fn downloads() -> Html {
 
 pub fn render_podcast_with_episodes(
     podcast: &Podcast,
-    episodes: Vec<EpisodeDownload>,
+    episodes: Vec<Episode>,
     downloaded_episode_count: usize,
     is_expanded: bool,
     toggle_pod_expanded: Callback<MouseEvent>,
@@ -571,13 +564,9 @@ pub fn render_podcast_with_episodes(
     audio_dispatch: Dispatch<UIState>,
     on_checkbox_change: Callback<i32>,
     show_modal: bool,
-    on_modal_open: Callback<MouseEvent>,
+    on_modal_open: Callback<i32>,
     on_modal_close: Callback<MouseEvent>,
 ) -> Html {
-    let history_clone = BrowserHistory::new();
-    let api_key = state.auth_details.as_ref().map(|ud| ud.api_key.clone());
-    let user_id = state.user_details.as_ref().map(|ud| ud.UserID.clone());
-    let server_name = state.auth_details.as_ref().map(|ud| ud.server_name.clone());
     let on_podcast_checkbox_change = {
         let episodes = episodes.clone();
         let on_checkbox_change = on_checkbox_change.clone();
@@ -648,131 +637,20 @@ pub fn render_podcast_with_episodes(
                 html! {
                     <div class="podcast-episodes-container expanded">
                         <div class="podcast-episodes-inner">
-                            { for episodes.into_iter().map(|episode| {
-                                let id_string = &episode.episodeid.to_string();
+                            {
+                                for episodes.into_iter().map(|episode| {
+                                    let on_checkbox_change_cloned = on_checkbox_change.clone();
 
-                                let dispatch = dispatch.clone();
-
-                                let episode_url_clone = episode.episodeurl.clone();
-                                let episode_title_clone = episode.episodetitle.clone();
-                                let episode_description_clone = episode.episodedescription.clone();
-                                let episode_artwork_clone = episode.episodeartwork.clone();
-                                let episode_duration_clone = episode.episodeduration.clone();
-                                let episode_id_clone = episode.episodeid.clone();
-                                let episode_listened_clone = episode.listenduration.clone();
-                                let episode_is_youtube = Some(episode.is_youtube.clone());
-                                let _completed = episode.completed;
-                                let desc_expanded = desc_rc.expanded_descriptions.contains(id_string);
-                                #[wasm_bindgen]
-                                extern "C" {
-                                    #[wasm_bindgen(js_namespace = window)]
-                                    fn toggleDescription(guid: &str, expanded: bool);
-                                }
-                                let toggle_expanded = {
-                                    let desc_dispatch = desc_state.clone();
-                                    let episode_guid = episode.episodeid.clone().to_string();
-
-                                    Callback::from(move |_: MouseEvent| {
-                                        let guid = episode_guid.clone();
-                                        desc_dispatch.reduce_mut(move |state| {
-                                            if state.expanded_descriptions.contains(&guid) {
-                                                state.expanded_descriptions.remove(&guid); // Collapse the description
-                                                toggleDescription(&guid, false); // Call JavaScript function
-                                            } else {
-                                                state.expanded_descriptions.insert(guid.clone()); // Expand the description
-                                                toggleDescription(&guid, true); // Call JavaScript function
-                                            }
-                                        });
-                                    })
-                                };
-
-                                let episode_url_for_closure = episode_url_clone.clone();
-                                let episode_title_for_closure = episode_title_clone.clone();
-                                let episode_description_for_closure = episode_description_clone.clone();
-                                let episode_artwork_for_closure = episode_artwork_clone.clone();
-                                let episode_duration_for_closure = episode_duration_clone.clone();
-                                let listener_duration_for_closure = episode_listened_clone.clone();
-                                let episode_id_for_closure = episode_id_clone.clone();
-                                let user_id_play = user_id.clone();
-                                let server_name_play = server_name.clone();
-                                let api_key_play = api_key.clone();
-                                let audio_dispatch = audio_dispatch.clone();
-                                let is_local = Option::from(true);
-
-                                let is_current_episode = audio_state
-                                                                .currently_playing
-                                                                .as_ref()
-                                                                .map_or(false, |current| current.episode_id == episode.episodeid);
-                                let is_playing = audio_state.audio_playing.unwrap_or(false);
-
-                                let date_format = match_date_format(state.date_format.as_deref());
-                                let datetime = parse_date(&episode.episodepubdate, &state.user_tz);
-                                let format_release = format!("{}", format_datetime(&datetime, &state.hour_preference, date_format));
-
-                                let on_play_pause = on_play_pause(
-                                    episode_url_for_closure.clone(),
-                                    episode_title_for_closure.clone(),
-                                    episode_description_for_closure.clone(),
-                                    format_release.clone(),
-                                    episode_artwork_for_closure.clone(),
-                                    episode_duration_for_closure.clone(),
-                                    episode_id_for_closure.clone(),
-                                    listener_duration_for_closure.clone(),
-                                    api_key_play.unwrap().unwrap(),
-                                    user_id_play.unwrap(),
-                                    server_name_play.unwrap(),
-                                    audio_dispatch.clone(),
-                                    audio_state.clone(),
-                                    is_local,
-                                    episode_is_youtube,
-                                );
-
-                                let on_shownotes_click = on_shownotes_click(
-                                    history_clone.clone(),
-                                    dispatch.clone(),
-                                    Some(episode_id_for_closure.clone()),
-                                    Some(String::from("Not needed")),
-                                    Some(String::from("Not needed")),
-                                    Some(String::from("Not needed")),
-                                    true,
-                                    None,
-                                    episode_is_youtube,
-                                );
-
-                                let on_checkbox_change_cloned = on_checkbox_change.clone();
-                                let episode_url_for_ep_item = episode_url_clone.clone();
-                                let sanitized_description =
-                                    sanitize_html_with_blank_target(&episode.episodedescription.clone());
-
-                                let check_episode_id = &episode.episodeid.clone();
-                                let is_completed = state
-                                    .completed_episodes
-                                    .as_ref()
-                                    .unwrap_or(&vec![])
-                                    .contains(&check_episode_id);
-                                download_episode_item(
-                                    Box::new(episode),
-                                    sanitized_description.clone(),
-                                    desc_expanded,
-                                    &format_release,
-                                    on_play_pause,
-                                    on_shownotes_click,
-                                    toggle_expanded,
-                                    episode_duration_clone,
-                                    episode_listened_clone,
-                                    "downloads",
-                                    on_checkbox_change_cloned, // Add this line
-                                    is_delete_mode, // Add this line
-                                    episode_url_for_ep_item,
-                                    is_completed,
-                                    show_modal,
-                                    on_modal_open.clone(),
-                                    on_modal_close.clone(),
-                                    is_current_episode,
-                                    is_playing,
-                                    state.clone()
-                                )
-                            }) }
+                                    html!{
+                                        <EpisodeListItem
+                                            episode={ episode }
+                                            page_type={ PageType::Downloads }
+                                            on_checkbox_change={ on_checkbox_change_cloned }
+                                            is_delete_mode={ is_delete_mode }
+                                        />
+                                    }
+                                })
+                            }
                         </div>
                     </div>
                 }

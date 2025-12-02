@@ -1,14 +1,14 @@
-use super::app_drawer::App_drawer;
-use super::gen_components::Search_nav;
+use crate::components::gen_components::Search_nav;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState, UserStatsStore};
 use crate::components::gen_funcs::{format_date, format_time_mins};
 use crate::requests::pod_req::call_get_pinepods_version;
 use crate::requests::stat_reqs;
+use crate::components::app_drawer::App_drawer;
+use i18nrs::yew::use_translation;
 use yew::prelude::*;
 use yew::{function_component, html, Html};
 use yewdux::prelude::*;
-use i18nrs::yew::use_translation;
 
 #[function_component(UserStats)]
 pub fn user_stats() -> Html {
@@ -127,14 +127,14 @@ pub fn user_stats() -> Html {
                                             <p class="stats-label">{i18n.t("user_stats.episodes_downloaded")}</p>
                                             <p class="stats-value">{ &stats.EpisodesDownloaded }</p>
                                         </div>
-                                        <div class={if let Some(stats) = user_stats { 
-                                            if stats.Pod_Sync_Type.as_str() == "None" { 
-                                                "stats-card col-span-1 md:col-span-3" 
-                                            } else { 
-                                                "stats-card" 
-                                            } 
-                                        } else { 
-                                            "stats-card" 
+                                        <div class={if let Some(stats) = user_stats {
+                                            if stats.Pod_Sync_Type.as_str() == "None" {
+                                                "stats-card col-span-1 md:col-span-3"
+                                            } else {
+                                                "stats-card"
+                                            }
+                                        } else {
+                                            "stats-card"
                                         }}>
                                             <p class="stats-label">{i18n.t("user_stats.podcast_sync_status")}</p>
                                             {
@@ -193,7 +193,23 @@ pub fn user_stats() -> Html {
             </div>
         {
             if let Some(audio_props) = &audio_state.currently_playing {
-                html! { <AudioPlayer src={audio_props.src.clone()} title={audio_props.title.clone()} description={audio_props.description.clone()} release_date={audio_props.release_date.clone()} artwork_url={audio_props.artwork_url.clone()} duration={audio_props.duration.clone()} episode_id={audio_props.episode_id.clone()} duration_sec={audio_props.duration_sec.clone()} start_pos_sec={audio_props.start_pos_sec.clone()} end_pos_sec={audio_props.end_pos_sec.clone()} offline={audio_props.offline.clone()} is_youtube={audio_props.is_youtube.clone()} /> }
+                html! {
+                    <AudioPlayer
+                        episode={audio_props.episode.clone()}
+                        src={audio_props.src.clone()}
+                        title={audio_props.title.clone()}
+                        description={audio_props.description.clone()}
+                        release_date={audio_props.release_date.clone()}
+                        artwork_url={audio_props.artwork_url.clone()}
+                        duration={audio_props.duration.clone()}
+                        episode_id={audio_props.episode_id.clone()}
+                        duration_sec={audio_props.duration_sec.clone()}
+                        start_pos_sec={audio_props.start_pos_sec.clone()}
+                        end_pos_sec={audio_props.end_pos_sec.clone()}
+                        offline={audio_props.offline.clone()}
+                        is_youtube={audio_props.is_youtube.clone()}
+                    />
+                }
             } else {
                 html! {}
             }

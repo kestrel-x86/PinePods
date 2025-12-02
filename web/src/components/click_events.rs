@@ -1,5 +1,5 @@
 use crate::components::context::AppState;
-use crate::components::podcast_layout::ClickedFeedURL;
+use crate::pages::podcast_layout::ClickedFeedURL;
 use crate::requests::pod_req::{call_check_podcast, call_get_podcast_id};
 use crate::requests::search_pods::{
     call_get_podcast_episodes, call_get_youtube_episodes, call_parse_podcast_url,
@@ -15,7 +15,8 @@ pub fn create_on_title_click(
     server_name: String,
     api_key: Option<Option<String>>,
     history: &BrowserHistory,
-    podcast_index_id: i64,
+    podcast_id: i32,
+    podcast_index_id: i32,
     podcast_title: String,
     podcast_url: String,
     podcast_description: String,
@@ -51,7 +52,7 @@ pub fn create_on_title_click(
             });
 
         let podcast_values = ClickedFeedURL {
-            podcastid: 0,
+            podcastid: podcast_id,
             podcastname: podcast_title.clone(),
             feedurl: podcast_url.clone(),
             description: podcast_description.clone(),
@@ -114,7 +115,7 @@ pub fn create_on_title_click(
                                     Ok(mut podcast_feed_results) => {
                                         // Fix is_youtube field for all episodes based on the endpoint used
                                         for episode in &mut podcast_feed_results.episodes {
-                                            episode.is_youtube = Some(is_youtube);
+                                            episode.is_youtube = is_youtube;
                                         }
                                         dispatch.reduce_mut(move |state| {
                                             state.podcast_added = Some(true);

@@ -1,6 +1,7 @@
 // navigation.rs
 use crate::components::context::AppState;
 use crate::components::gen_funcs::generate_gravatar_url;
+use crate::components::loading::Loading;
 use crate::requests::login_requests::{
     call_get_time_info, call_verify_key, use_check_authentication,
 };
@@ -169,10 +170,10 @@ pub fn navigation_handler(props: &NavigationHandlerProps) -> Html {
                                                                 // Check for unmatched podcasts and show notification
                                                                 let dispatch_unmatched = dispatch_clone.clone();
                                                                 if let Ok(unmatched_response) = call_get_unmatched_podcasts(
-                                                                    server_name,
-                                                                    api_key,
-                                                                    user_id,
-                                                                ).await {
+                                                                        server_name,
+                                                                        api_key,
+                                                                        user_id,
+                                                                    ).await {
                                                                     if !unmatched_response.podcasts.is_empty() {
                                                                         dispatch_unmatched.reduce_mut(|state| {
                                                                             state.info_message = Some(
@@ -270,18 +271,9 @@ pub fn navigation_handler(props: &NavigationHandlerProps) -> Html {
 
     html! {
         if *loading {
-            <div class="loading-animation">
-                <div class="frame1"></div>
-                <div class="frame2"></div>
-                <div class="frame3"></div>
-                <div class="frame4"></div>
-                <div class="frame5"></div>
-                <div class="frame6"></div>
-            </div>
+            { html! { <Loading /> } }
         } else {
-            <>
-                { props.children.clone() }
-            </>
+            { props.children.clone() }
         }
     }
 }

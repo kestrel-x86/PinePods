@@ -1,6 +1,6 @@
-use super::routes::Route;
 use crate::components::context::{AppState, UserStatsStore};
 use crate::components::navigation::use_back_button;
+use crate::pages::routes::Route;
 use crate::requests::pod_req::{call_get_pinepods_version, connect_to_episode_websocket};
 use i18nrs::yew::use_translation;
 use wasm_bindgen_futures::spawn_local;
@@ -37,6 +37,7 @@ pub fn app_drawer() -> Html {
     // let (state, _dispatch) = use_store::<AppState>();
 
     // Capture i18n strings before they get moved
+    let i18n_local_downloads = i18n.t("app_drawer.local_downloads").to_string();
     let i18n_pinepods = i18n.t("app_drawer.pinepods").to_string();
     let i18n_home = i18n.t("navigation.home").to_string();
     let i18n_feed = i18n.t("app_drawer.feed").to_string();
