@@ -43,6 +43,38 @@ pub async fn bulk_mark_episodes_completed(
     }))
 }
 
+// Bulk mark episodes as incomplete
+pub async fn bulk_mark_episodes_incomplete(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<BulkEpisodeActionRequest>,
+) -> AppResult<Json<BulkEpisodeActionResponse>> {
+    let api_key = extract_api_key(&headers)?;
+    validate_api_key(&state, &api_key).await?;
+
+    let calling_user_id = state.db_pool.get_user_id_from_api_key(&api_key).await?;
+    if calling_user_id != request.user_id {
+        return Err(AppError::forbidden("You can only mark episodes as incomplete for yourself!"));
+    }
+
+    let is_youtube = request.is_youtube.unwrap_or(false);
+    let (processed_count, failed_count) = state.db_pool
+        .bulk_mark_episodes_incomplete(request.episode_ids, request.user_id, is_youtube)
+        .await?;
+
+    let message = if failed_count > 0 {
+        format!("Marked {} episodes as incomplete, {} failed", processed_count, failed_count)
+    } else {
+        format!("Successfully marked {} episodes as incomplete", processed_count)
+    };
+
+    Ok(Json(BulkEpisodeActionResponse {
+        message,
+        processed_count,
+        failed_count: if failed_count > 0 { Some(failed_count) } else { None },
+    }))
+}
+
 // Bulk save episodes
 pub async fn bulk_save_episodes(
     State(state): State<AppState>,

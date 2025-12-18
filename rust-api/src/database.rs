@@ -2794,6 +2794,117 @@ impl DatabasePool {
         }
     }
 
+    // Mark episode as incomplete
+    pub async fn mark_episode_incomplete(
+        &self,
+        episode_id: i32,
+        user_id: i32,
+        is_youtube: bool,
+    ) -> AppResult<()> {
+        match self {
+            DatabasePool::Postgres(pool) => {
+                if is_youtube {
+                    // Update completion status
+                    sqlx::query(
+                        r#"UPDATE "YouTubeVideos" SET completed = FALSE WHERE videoid = $1"#,
+                    )
+                    .bind(episode_id)
+                    .execute(pool)
+                    .await?;
+
+                    // Update history
+                    sqlx::query(
+                        r#"INSERT INTO "UserVideoHistory" (userid, videoid, listendate, listenduration)
+                            VALUES ($1, $2, NOW(), $3)
+                            ON CONFLICT (userid, videoid)
+                            DO UPDATE SET listenduration = $4, listendate = NOW()"#
+                    )
+                    .bind(user_id)
+                    .bind(episode_id)
+                    .bind(0)
+                    .bind(0)
+                    .execute(pool)
+                    .await?;
+                } else {
+                    // Update completion status
+                    sqlx::query(r#"UPDATE "Episodes" SET completed = FALSE WHERE episodeid = $1"#)
+                        .bind(episode_id)
+                        .execute(pool)
+                        .await?;
+
+                    // Update history
+                    sqlx::query(
+                                r#"INSERT INTO "UserEpisodeHistory" (userid, episodeid, listendate, listenduration)
+                                   VALUES ($1, $2, NOW(), $3)
+                                   ON CONFLICT (userid, episodeid)
+                                   DO UPDATE SET listenduration = $4, listendate = NOW()"#
+                            )
+                            .bind(user_id)
+                            .bind(episode_id)
+                            .bind(0)
+                            .bind(0)
+                            .execute(pool)
+                            .await?;
+                }
+                Ok(())
+            }
+            DatabasePool::MySQL(pool) => {
+                if is_youtube {
+                    // Get YouTube video duration
+                    let duration_row =
+                        sqlx::query("SELECT Duration FROM YouTubeVideos WHERE VideoID = ?")
+                            .bind(episode_id)
+                            .fetch_optional(pool)
+                            .await?;
+
+                    if let Some(row) = duration_row {
+                            // Update completion status
+                            sqlx::query("UPDATE YouTubeVideos SET Completed = 1 WHERE VideoID = ?")
+                                .bind(episode_id)
+                                .execute(pool)
+                                .await?;
+
+                            // Update history
+                            sqlx::query(
+                                "INSERT INTO UserVideoHistory (UserID, VideoID, ListenDate, ListenDuration)
+                                 VALUES (?, ?, NOW(), ?)
+                                 ON DUPLICATE KEY UPDATE
+                                     ListenDuration = ?,
+                                     ListenDate = NOW()"
+                            )
+                            .bind(user_id)
+                            .bind(episode_id)
+                            .bind(0)
+                            .bind(0)
+                            .execute(pool)
+                            .await?;
+                } else {
+                    // Update completion status
+                    sqlx::query("UPDATE Episodes SET Completed = 1 WHERE EpisodeID = ?")
+                        .bind(episode_id)
+                        .execute(pool)
+                        .await?;
+
+                    // Update history
+                    sqlx::query(
+                        "INSERT INTO UserEpisodeHistory (UserID, EpisodeID, ListenDate, ListenDuration)
+                            VALUES (?, ?, NOW(), ?)
+                            ON DUPLICATE KEY UPDATE
+                                ListenDuration = ?,
+                                ListenDate = NOW()"
+                    )
+                    .bind(user_id)
+                    .bind(episode_id)
+                    .bind(0)
+                    .bind(0)
+                    .execute(pool)
+                    .await?;
+                }
+                Ok(())
+            }
+        }
+    }
+
     // Increment played count - matches Python increment_played function
     pub async fn increment_played(&self, user_id: i32) -> AppResult<()> {
         match self {

@@ -238,6 +238,7 @@
     "failed_to_parse_duration": "Failed to parse duration",
     "in_this_episode": "In This Episode",
     "mark_complete": "Mark Complete",
+    "mark_icomplete": "Mark Incomplete",
     "mark_episode_complete": "Mark Episode Complete",
     "mark_episode_incomplete": "Mark Episode Incomplete",
     "mark_incomplete": "Mark Incomplete",

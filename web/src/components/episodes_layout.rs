@@ -11,11 +11,12 @@ use crate::components::podcast_layout::ClickedFeedURL;
 use crate::components::virtual_list::PodcastEpisodeVirtualList;
 use crate::requests::pod_req::{
     call_add_category, call_add_podcast, call_adjust_skip_times, call_bulk_download_episodes,
-    call_bulk_mark_episodes_completed, call_bulk_queue_episodes, call_bulk_save_episodes,
-    call_check_podcast, call_clear_playback_speed, call_download_all_podcast,
-    call_enable_auto_download, call_fetch_podcasting_2_pod_data, call_get_auto_download_status,
-    call_get_feed_cutoff_days, call_get_merged_podcasts, call_get_play_episode_details,
-    call_get_podcast_details, call_get_podcast_id_from_ep, call_get_podcast_id_from_ep_name,
+    call_bulk_mark_episodes_completed, call_bulk_mark_episodes_incomplete,
+    call_bulk_queue_episodes, call_bulk_save_episodes, call_check_podcast,
+    call_clear_playback_speed, call_download_all_podcast, call_enable_auto_download,
+    call_fetch_podcasting_2_pod_data, call_get_auto_download_status, call_get_feed_cutoff_days,
+    call_get_merged_podcasts, call_get_play_episode_details, call_get_podcast_details,
+    call_get_podcast_id_from_ep, call_get_podcast_id_from_ep_name,
     call_get_podcast_notifications_status, call_get_podcasts, call_get_rss_key,
     call_merge_podcasts, call_remove_category, call_remove_podcasts_name,
     call_remove_youtube_channel, call_set_playback_speed, call_toggle_podcast_notifications,
@@ -459,6 +460,7 @@ pub fn episode_layout() -> Html {
     let i18n_select_all = i18n.t("episodes_layout.select_all").to_string();
     let i18n_select_unplayed = i18n.t("episodes_layout.select_unplayed").to_string();
     let i18n_mark_complete = i18n.t("episodes_layout.mark_complete").to_string();
+    let i18n_mark_incomplete = i18n.t("episodes_layout.mark_incomplete").to_string();
     let i18n_queue_episodes = i18n.t("episodes_layout.queue_episodes").to_string();
     let i18n_download_episodes = i18n.t("episodes_layout.download_episodes").to_string();
     let i18n_no_episodes_found = i18n.t("episodes_layout.no_episodes_found").to_string();
@@ -3983,6 +3985,50 @@ pub fn episode_layout() -> Html {
                                                             class="bulk-action-success"
                                                         >
                                                             {&i18n_mark_complete}
+                                                        </button>
+
+                                                        <button
+                                                            onclick={
+                                                                let selected_ids = selected_ids.clone();
+                                                                let api_key = api_key.clone();
+                                                                let server_name = server_name.clone();
+                                                                let dispatch = _search_dispatch.clone();
+                                                                let selected_episodes = selected_episodes.clone();
+                                                                Callback::from(move |_| {
+                                                                    let selected_ids = selected_ids.clone();
+                                                                    let api_key = api_key.clone();
+                                                                    let server_name = server_name.clone();
+                                                                    let dispatch = dispatch.clone();
+                                                                    let selected_episodes = selected_episodes.clone();
+                                                                    spawn_local(async move {
+                                                                        let request = BulkEpisodeActionRequest {
+                                                                            episode_ids: selected_ids,
+                                                                            user_id: user_id_value,
+                                                                            is_youtube: None,
+                                                                        };
+                                                                        match call_bulk_mark_episodes_incomplete(
+                                                                            &server_name.unwrap_or_default(),
+                                                                            &api_key.flatten(),
+                                                                            &request
+                                                                        ).await {
+                                                                            Ok(message) => {
+                                                                                dispatch.reduce_mut(|state| {
+                                                                                    state.info_message = Some(message);
+                                                                                });
+                                                                                selected_episodes.set(HashSet::new());
+                                                                            }
+                                                                            Err(e) => {
+                                                                                dispatch.reduce_mut(|state| {
+                                                                                    state.error_message = Some(format!("Error: {}", e));
+                                                                                });
+                                                                            }
+                                                                        }
+                                                                    });
+                                                                })
+                                                            }
+                                                            class="bulk-action-inverse-success"
+                                                        >
+                                                            {&i18n_mark_incomplete}
                                                         </button>
 
                                                         // Save button
