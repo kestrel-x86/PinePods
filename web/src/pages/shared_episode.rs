@@ -1,4 +1,5 @@
-use super::gen_components::{empty_message, FallbackImage, UseScrollToTop};
+use crate::components::loading::Loading;
+use crate::components::gen_components::{empty_message, FallbackImage, UseScrollToTop};
 use crate::components::audio::on_play_click_shared;
 use crate::components::audio::AudioPlayer;
 use crate::components::context::{AppState, UIState};
@@ -144,16 +145,7 @@ pub fn shared_episode(_props: &SharedProps) -> Html {
             <UseScrollToTop />
             {
                 if *loading { // If loading is true, display the loading animation
-                    html! {
-                        <div class="loading-animation">
-                            <div class="frame1"></div>
-                            <div class="frame2"></div>
-                            <div class="frame3"></div>
-                            <div class="frame4"></div>
-                            <div class="frame5"></div>
-                            <div class="frame6"></div>
-                        </div>
-                    }
+                    html! { <Loading/> }
                 } else {
                     if let Some(episode) = state.shared_fetched_episode.clone() {
                         let episode_url_clone = episode.episode.episodeurl.clone();
@@ -178,6 +170,7 @@ pub fn shared_episode(_props: &SharedProps) -> Html {
                         let audio_dispatch = audio_dispatch.clone();
 
                         let on_play_click = on_play_click_shared(
+                            episode.episode.clone(),
                             episode_url_for_closure.clone(),
                             episode_title_for_closure.clone(),
                             episode_desc_for_closure.clone(),
@@ -191,7 +184,7 @@ pub fn shared_episode(_props: &SharedProps) -> Html {
 
                         let datetime = parse_date(&episode.episode.episodepubdate, &state.user_tz);
                         let date_format = match_date_format(state.date_format.as_deref());
-                        let format_duration = format_time(episode.episode.episodeduration as f64);
+                        let format_duration = format_time(episode.episode.episodeduration);
                         let format_release = format!("{}", format_datetime(&datetime, &state.hour_preference, date_format));
 
                         let open_in_new_tab = Callback::from(move |url: String| {
@@ -323,7 +316,23 @@ pub fn shared_episode(_props: &SharedProps) -> Html {
             }
         {
             if let Some(audio_props) = &audio_state.currently_playing {
-                html! { <AudioPlayer src={audio_props.src.clone()} title={audio_props.title.clone()} description={audio_props.description.clone()} release_date={audio_props.release_date.clone()} artwork_url={audio_props.artwork_url.clone()} duration={audio_props.duration.clone()} episode_id={audio_props.episode_id.clone()} duration_sec={audio_props.duration_sec.clone()} start_pos_sec={audio_props.start_pos_sec.clone()} end_pos_sec={audio_props.end_pos_sec.clone()} offline={audio_props.offline.clone()} is_youtube={audio_props.is_youtube.clone()} /> }
+                html! {
+                    <AudioPlayer
+                        episode={audio_props.episode.clone()}
+                        src={audio_props.src.clone()}
+                        title={audio_props.title.clone()}
+                        description={audio_props.description.clone()}
+                        release_date={audio_props.release_date.clone()}
+                        artwork_url={audio_props.artwork_url.clone()}
+                        duration={audio_props.duration.clone()}
+                        episode_id={audio_props.episode_id.clone()}
+                        duration_sec={audio_props.duration_sec.clone()}
+                        start_pos_sec={audio_props.start_pos_sec.clone()}
+                        end_pos_sec={audio_props.end_pos_sec.clone()}
+                        offline={audio_props.offline.clone()}
+                        is_youtube={audio_props.is_youtube.clone()}
+                    />
+                }
             } else {
                 html! {}
             }

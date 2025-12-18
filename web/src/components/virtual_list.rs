@@ -1,72 +1,80 @@
-use super::gen_components::{
-    on_shownotes_click, ContextButton, EpisodeModal, EpisodeTrait, FallbackImage,
-};
-use super::gen_funcs::{format_datetime, match_date_format, parse_date};
-use crate::components::audio::on_play_pause;
-use crate::components::context::{AppState, UIState};
-use crate::components::gen_funcs::{
-    convert_time_to_seconds, sanitize_html_with_blank_target, truncate_description,
-};
-use crate::components::gen_funcs::{format_time, strip_images_from_html};
-use crate::components::safehtml::SafeHtml;
-use crate::requests::people_req::PersonEpisode;
-use crate::requests::search_pods::Episode;
+use crate::components::context_menu_button::PageType;
+use crate::components::episode_list_item::EpisodeListItem;
+use crate::requests::episode::Episode;
 use gloo::events::EventListener;
 use i18nrs::yew::use_translation;
-use std::rc::Rc;
 use wasm_bindgen::JsCast;
-use web_sys::{window, Element, HtmlElement, MouseEvent};
+use web_sys::{window, Element, HtmlElement};
 use yew::prelude::*;
 use yew::Properties;
 use yew::{function_component, html, use_effect_with, use_node_ref, Callback, Html};
-use yew_router::history::BrowserHistory;
 use yewdux::prelude::*;
 
-#[derive(Properties, PartialEq)]
-pub struct PodcastEpisodeVirtualListProps {
-    pub episodes: Vec<Episode>,
-    pub item_height: f64,
-    pub podcast_added: bool,
-    pub search_state: Rc<AppState>,
-    pub search_ui_state: Rc<UIState>,
-    pub dispatch: Dispatch<UIState>,
-    pub search_dispatch: Dispatch<AppState>,
-    pub history: BrowserHistory,
-    pub server_name: Option<String>,
-    pub user_id: Option<i32>,
-    pub api_key: Option<Option<String>>,
-    pub podcast_link: String,
-    pub podcast_title: String,
-    // Bulk selection props
-    pub selected_episodes: Option<Rc<std::collections::HashSet<i32>>>,
-    pub is_selecting: Option<bool>,
-    pub on_episode_select: Option<Callback<(i32, bool)>>,
-    pub on_select_older: Option<Callback<i32>>,
-    pub on_select_newer: Option<Callback<i32>>,
+// Helper function to calculate responsive item height - MUST be synchronous and accurate
+#[allow(dead_code)]
+fn calculate_item_height(window_width: f64) -> f64 {
+    // CRITICAL: Must match the exact height that episodes render at, including margin
+    // Episodes render at container_height + mb-4 margin (16px)
+    let height = if window_width <= 530.0 {
+        122.0 + 16.0 // Mobile: episode container 122px + mb-4 margin
+    } else if window_width <= 768.0 {
+        150.0 + 16.0 // Tablet: episode container 150px + mb-4 margin
+    } else {
+        221.0 + 16.0 // Desktop: episode container 221px + mb-4 margin
+    };
+
+    web_sys::console::log_1(
+        &format!(
+            "FEED HEIGHT CALC: width={}, calculated_height={}",
+            window_width, height
+        )
+        .into(),
+    );
+
+    height
 }
 
-#[function_component(PodcastEpisodeVirtualList)]
-pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> Html {
-    let (i18n, _) = use_translation();
+/// Any required callbacks for drag interactions. Field can be None if no callback is required.
+/// If no fields are set, dragging for this VirtualList will be disabled
+#[derive(Properties, PartialEq, Clone, Default)]
+pub struct DragCallbacks {
+    pub ondragstart: Option<Callback<DragEvent>>,
+    pub ondragenter: Option<Callback<DragEvent>>,
+    pub ondragover: Option<Callback<DragEvent>>,
+    pub ondrop: Option<Callback<DragEvent>>,
+}
+
+impl DragCallbacks {
+    /// Item is draggable if any callback field is set
+    pub fn draggable(&self) -> bool {
+        return self.ondragstart.is_some()
+            || self.ondragenter.is_some()
+            || self.ondragover.is_some()
+            || self.ondrop.is_some();
+    }
+}
+
+#[derive(Properties, PartialEq)]
+pub struct VirtualListProps {
+    pub episodes: Vec<Episode>,
+    #[prop_or(PageType::Default)]
+    pub page_type: PageType,
+    #[prop_or_default]
+    pub drag_callbacks: DragCallbacks,
+}
+
+#[function_component(VirtualList)]
+pub fn virtual_list(props: &VirtualListProps) -> Html {
     let scroll_pos = use_state(|| 0.0);
     let container_ref = use_node_ref();
     let container_height = use_state(|| 0.0);
     let item_height = use_state(|| 234.0); // Default item height
-    let container_item_height = use_state(|| 221.0); // Actual container height, separate from spacing
     let force_update = use_state(|| 0);
-    let selected_episode_index = use_state(|| None::<usize>);
-
-    // Pre-capture translation strings
-    let select_newer_title = i18n.t("virtual_list.select_newer_episodes");
-    let select_older_title = i18n.t("virtual_list.select_older_episodes");
-    let completed_text = i18n.t("virtual_list.completed");
-    let cover_for_text = i18n.t("virtual_list.cover_for");
 
     // Effect to set initial container height, item height, and listen for window resize
     {
         let container_height = container_height.clone();
         let item_height = item_height.clone();
-        let container_item_height = container_item_height.clone();
         let force_update = force_update.clone();
 
         use_effect_with((), move |_| {
@@ -78,17 +86,9 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
                 container_height.set(height - 100.0);
 
                 let width = window_clone.inner_width().unwrap().as_f64().unwrap();
-                // Set both the total item height (with margin) and container height
-                let (new_item_height, new_container_height) = if width <= 530.0 {
-                    (122.0 + 16.0, 122.0)
-                } else if width <= 768.0 {
-                    (150.0 + 16.0, 150.0)
-                } else {
-                    (221.0 + 16.0, 221.0)
-                };
+                let new_item_height = calculate_item_height(width);
 
                 item_height.set(new_item_height);
-                container_item_height.set(new_container_height);
                 force_update.set(*force_update + 1);
             });
 
@@ -102,654 +102,99 @@ pub fn podcast_episode_virtual_list(props: &PodcastEpisodeVirtualListProps) -> H
         });
     }
 
-    // Effect for scroll handling
+    // Effect for scroll handling - prevent feedback loop with debouncing
     {
         let scroll_pos = scroll_pos.clone();
         let container_ref = container_ref.clone();
         use_effect_with(container_ref.clone(), move |container_ref| {
-            let container = container_ref.cast::<HtmlElement>().unwrap();
-            let listener = EventListener::new(&container, "scroll", move |event| {
-                let target = event.target().unwrap().unchecked_into::<Element>();
-                scroll_pos.set(target.scroll_top() as f64);
-            });
-            move || drop(listener)
+            if let Some(container) = container_ref.cast::<HtmlElement>() {
+                let scroll_pos_clone = scroll_pos.clone();
+                let is_updating = std::rc::Rc::new(std::cell::RefCell::new(false));
+
+                let scroll_listener = EventListener::new(&container, "scroll", move |event| {
+                    // Prevent re-entrant calls that cause feedback loops
+                    if *is_updating.borrow() {
+                        return;
+                    }
+
+                    if let Some(target) = event.target() {
+                        if let Ok(element) = target.dyn_into::<Element>() {
+                            let new_scroll_top = element.scroll_top() as f64;
+                            let old_scroll_top = *scroll_pos_clone;
+
+                            // Always update scroll position for smoothest scrolling
+                            if new_scroll_top != old_scroll_top {
+                                *is_updating.borrow_mut() = true;
+
+                                // Use requestAnimationFrame to batch updates and prevent feedback
+                                let scroll_pos_clone2 = scroll_pos_clone.clone();
+                                let is_updating_clone = is_updating.clone();
+                                let callback =
+                                    wasm_bindgen::closure::Closure::wrap(Box::new(move || {
+                                        scroll_pos_clone2.set(new_scroll_top);
+                                        *is_updating_clone.borrow_mut() = false;
+                                    })
+                                        as Box<dyn FnMut()>);
+
+                                web_sys::window()
+                                    .unwrap()
+                                    .request_animation_frame(callback.as_ref().unchecked_ref())
+                                    .unwrap();
+                                callback.forget();
+                            }
+                        }
+                    }
+                });
+
+                Box::new(move || {
+                    drop(scroll_listener);
+                }) as Box<dyn FnOnce()>
+            } else {
+                Box::new(|| {}) as Box<dyn FnOnce()>
+            }
         });
     }
 
     let start_index = (*scroll_pos / *item_height).floor() as usize;
     let visible_count = ((*container_height / *item_height).ceil() as usize) + 1;
-    let end_index = (start_index + visible_count).min(props.episodes.len());
 
-    let on_modal_close = {
-        let selected_episode_index = selected_episode_index.clone();
-        Callback::from(move |_: MouseEvent| selected_episode_index.set(None))
-    };
+    // Add buffer episodes above and below for smooth scrolling
+    let buffer_size = 2; // Render 2 extra episodes above and below
+    let buffered_start = start_index.saturating_sub(buffer_size);
+    let buffered_end = (start_index + visible_count + buffer_size).min(props.episodes.len());
 
-    let visible_episodes = (start_index..end_index)
+    let visible_episodes = (buffered_start..buffered_end)
         .map(|index| {
-            // Replace the modal open/close callbacks with:
-            let on_modal_open = {
-                let selected_episode_index = selected_episode_index.clone();
-                let index = index; // This is your loop index
-                Callback::from(move |_: MouseEvent| selected_episode_index.set(Some(index)))
-            };
-
-            let episode = &props.episodes[index];
-            let dispatch = props.dispatch.clone();
-            let search_state_clone = props.search_state.clone();
-            let search_ui_state_clone = props.search_ui_state.clone();
-
-            let episode_url_clone = episode.enclosure_url.clone().unwrap_or_default();
-            let episode_title_clone = episode.title.clone().unwrap_or_default();
-            let episode_description_clone = episode.description.clone().unwrap_or_default();
-            let episode_artwork_clone = episode.artwork.clone().unwrap_or_default();
-            let episode_duration_clone = episode.duration.clone().unwrap_or_default();
-            let episode_is_youtube = episode.is_youtube.clone();
-            web_sys::console::log_1(&format!("Virtual List - episode.is_youtube: {:?}", episode_is_youtube).into());
-            let episode_duration_in_seconds = match convert_time_to_seconds(&episode_duration_clone) {
-                Ok(seconds) => seconds as i32,
-                Err(e) => {
-                    eprintln!("Failed to convert time to seconds: {}", e);
-                    0
-                }
-            };
-            let episode_id_clone = episode.episode_id.unwrap_or(0);
-
-            let server_name_play = props.server_name.clone();
-            let user_id_play = props.user_id;
-            let api_key_play = props.api_key.clone();
-
-            let is_expanded = search_state_clone.expanded_descriptions.contains(&episode.guid.clone().unwrap());
-
-            let sanitized_description = sanitize_html_with_blank_target(&episode.description.clone().unwrap_or_default());
-            let (description, _is_truncated) = if is_expanded {
-                (sanitized_description, false)
-            } else {
-                truncate_description(sanitized_description, 300)
-            };
-
-            let date_format = match_date_format(search_state_clone.date_format.as_deref());
-            let datetime = parse_date(&episode.pub_date.clone().unwrap_or_default(), &search_state_clone.user_tz);
-            let format_release = format!("{}", format_datetime(&datetime, &search_state_clone.hour_preference, date_format));
-
-            // Check if episode is downloaded when podcast is added to database
-            let is_local = if props.podcast_added && episode_id_clone != 0 {
-                // Podcast is in database, check if episode is downloaded
-                if search_state_clone
-                    .downloaded_episode_ids
-                    .as_ref()
-                    .map(|ids| ids.contains(&episode_id_clone))
-                    .unwrap_or(false)
-                {
-                    Some(true)
-                } else {
-                    #[cfg(not(feature = "server_build"))]
-                    {
-                        if search_state_clone
-                            .locally_downloaded_episodes
-                            .as_ref()
-                            .map(|episodes| episodes.contains(&episode_id_clone))
-                            .unwrap_or(false)
-                        {
-                            Some(true)
-                        } else {
-                            None
-                        }
-                    }
-                    #[cfg(feature = "server_build")]
-                    {
-                        None
-                    }
-                }
-            } else {
-                None // Podcast not in database, can't be downloaded
-            };
-
-            let on_play_pause = on_play_pause(
-                episode_url_clone.clone(),
-                episode_title_clone.clone(),
-                episode_description_clone.clone(),
-                format_release.clone(),
-                episode_artwork_clone.clone(),
-                episode_duration_in_seconds,
-                episode_id_clone.clone(),
-                episode.listen_duration, // Use actual listen_duration instead of Some(0)
-                api_key_play.unwrap().unwrap(),
-                user_id_play.unwrap(),
-                server_name_play.unwrap(),
-                dispatch.clone(),
-                search_ui_state_clone.clone(),
-                is_local,
-                episode_is_youtube, // is_youtube_vid
-            );
-
-            let boxed_episode = Box::new(episode.clone()) as Box<dyn EpisodeTrait>;
-            let formatted_duration = format_time(episode_duration_in_seconds.into());
-            let is_current_episode = props.search_ui_state
-                .currently_playing
-                .as_ref()
-                .map_or(false, |current| {
-                    let title_match = current.title == episode.title.clone().unwrap_or_default();
-                    let url_match = current.src == episode.enclosure_url.clone().unwrap_or_default();
-
-                    // Add episode_id comparison
-                    let id_match = current.episode_id == episode.episode_id.unwrap_or(0);
-
-                    // If it's YouTube content, prioritize ID and title match over URL
-                    if episode.is_youtube.unwrap_or(false) {
-                        id_match || title_match
-                    } else {
-                        // For regular podcasts, use the original logic
-                        title_match && url_match
-                    }
-                });
-
-            let is_playing = props.search_ui_state.audio_playing.unwrap_or(false);
-
-            let episode_url_for_ep_item = episode_url_clone.clone();
-            let should_show_buttons = !episode_url_for_ep_item.is_empty();
-            let preview_description = strip_images_from_html(&description);
-
-            // Check if viewport is narrow (< 500px)
-            let is_narrow_viewport = {
-                let window = web_sys::window().expect("no global window exists");
-                window.inner_width().unwrap().as_f64().unwrap() < 500.0
-            };
-
-            let make_shownotes_callback = {
-                let history = props.history.clone();
-                let search_dispatch = props.search_dispatch.clone();
-                let podcast_link = props.podcast_link.clone();
-                let podcast_title = props.podcast_title.clone();
-                let episode_id = episode.episode_id.unwrap_or(0);
-                let episode_url = episode.enclosure_url.clone().unwrap_or_default();
-                let is_youtube = episode.is_youtube.clone();
-
-                Callback::from(move |_: MouseEvent| {
-                    on_shownotes_click(
-                        history.clone(),
-                        search_dispatch.clone(),
-                        Some(episode_id),
-                        Some(podcast_link.clone()),
-                        Some(episode_url.clone()),
-                        Some(podcast_title.clone()),
-                        true,
-                        None,
-                        is_youtube
-                    ).emit(MouseEvent::new("click").unwrap());
-                })
-            };
-
+            let episode = props.episodes[index].clone();
             html! {
-                <>
-                <div
-                    key={format!("{}-{}", episode.episode_id.unwrap_or(0), *force_update)}
-                    class="item-container border-solid border flex items-start mb-4 shadow-md rounded-lg"
-                    style={format!("height: {}px; overflow: hidden;", *container_item_height)}
-                >
-                    {
-                        // Show checkbox when in selection mode
-                        if props.is_selecting.unwrap_or(false) {
-                            let episode_id = episode.episode_id.unwrap_or(0);
-                            let is_selected = props.selected_episodes.as_ref().map_or(false, |selected| selected.contains(&episode_id));
-                            let on_select = props.on_episode_select.clone();
-                            let checkbox_callback = Callback::from(move |_| {
-                                if let Some(callback) = &on_select {
-                                    callback.emit((episode_id, !is_selected));
-                                }
-                            });
-
-                            html! {
-                                <div class="flex flex-col items-center justify-center pl-4" style={format!("height: {}px;", *container_item_height)}>
-                                    {
-                                        if let Some(on_select_newer) = &props.on_select_newer {
-                                            let episode_id = episode.episode_id.unwrap_or(0);
-                                            let callback = on_select_newer.clone();
-                                            let newer_callback = Callback::from(move |_| {
-                                                callback.emit(episode_id);
-                                            });
-                                            html! {
-                                                <button
-                                                    onclick={newer_callback}
-                                                    class="episode-select-button mb-1"
-                                                    title={select_newer_title.clone()}
-                                                >
-                                                    {"↑"}
-                                                </button>
-                                            }
-                                        } else {
-                                            html! {}
-                                        }
-                                    }
-                                    <input
-                                        type="checkbox"
-                                        checked={is_selected}
-                                        onchange={checkbox_callback}
-                                        class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 my-1"
-                                    />
-                                    {
-                                        if let Some(on_select_older) = &props.on_select_older {
-                                            let episode_id = episode.episode_id.unwrap_or(0);
-                                            let callback = on_select_older.clone();
-                                            let older_callback = Callback::from(move |_| {
-                                                callback.emit(episode_id);
-                                            });
-                                            html! {
-                                                <button
-                                                    onclick={older_callback}
-                                                    class="episode-select-button mt-1"
-                                                    title={select_older_title.clone()}
-                                                >
-                                                    {"↓"}
-                                                </button>
-                                            }
-                                        } else {
-                                            html! {}
-                                        }
-                                    }
-                                </div>
-                            }
-                        } else {
-                            html! {}
-                        }
-                    }
-                    <div class="flex flex-col w-auto object-cover pl-4">
-                        <FallbackImage
-                            src={episode.artwork.clone().unwrap_or_default()}
-                            alt={format!("{} {}", cover_for_text, &episode.title.clone().unwrap_or_default())}
-                            class="episode-image"
-                        />
-                    </div>
-                    <div class="flex flex-col p-4 space-y-2 flex-grow md:w-7/12">
-                        <div class="flex items-center space-x-2 cursor-pointer" onclick={make_shownotes_callback.clone()}>
-                            <p class="item_container-text episode-title font-semibold line-clamp-2">
-                                { &episode.title.clone().unwrap_or_default() }
-                            </p>
-                            {
-                                if episode.completed.unwrap_or(false) {
-                                    html! {
-                                        <i class="ph ph-check-circle text-2xl text-green-500"></i>
-                                    }
-                                } else {
-                                    html! {}
-                                }
-                            }
-                        </div>
-                        {
-                            html! {
-                                <div class="item-description-text cursor-pointer hidden md:block"
-                                     onclick={on_modal_open.clone()}>
-                                    <div class="item_container-text line-clamp-2">
-                                        <SafeHtml html={preview_description} />
-                                    </div>
-                                </div>
-                            }
-                        }
-                        <div class="episode-time-badge-container" style="max-width: 100%; overflow: hidden;">
-                            <span
-                                class="episode-time-badge inline-flex items-center px-2.5 py-0.5 rounded me-2"
-                                style="flex-grow: 0; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
-                            >
-                                <svg class="time-icon w-2.5 h-2.5 me-1.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M10 0a10 10 0 1 0 10 10A10.011 10.011 0 0 0 10 0Zm3.982 13.982a1 1 0 0 1-1.414 0l-3.274-3.274A1.012 1.012 0 0 1 9 10V6a1 1 0 0 1 2 0v3.586l2.982 2.982a1 1 0 0 1 0 1.414Z"/>
-                                </svg>
-                                { format_release.clone() }
-                            </span>
-                        </div>
-
-                        {
-                            if episode.completed.unwrap_or(false) {
-                                // For completed episodes
-                                if is_narrow_viewport {
-                                    // In narrow viewports, just show "Completed"
-                                    html! {
-                                        <div class="flex items-center space-x-2">
-                                            <span class="item_container-text">{completed_text.clone()}</span>
-                                        </div>
-                                    }
-                                } else {
-                                    // In wider viewports, show duration and "Completed"
-                                    html! {
-                                        <div class="flex items-center space-x-2">
-                                            <span class="item_container-text">{ formatted_duration }</span>
-                                            <span class="item_container-text">{ format!("-  {}", completed_text.clone()) }</span>
-                                        </div>
-                                    }
-                                }
-                            } else {
-                                if let Some(listen_duration) = episode.listen_duration {
-                                    let listen_duration_percentage = if episode_duration_in_seconds > 0 {
-                                        ((listen_duration as f64 / episode_duration_in_seconds as f64) * 100.0).min(100.0)
-                                    } else {
-                                        0.0
-                                    };
-                                    html! {
-                                        <div class="flex items-center space-x-2">
-                                            // Only show current position in wider viewports
-                                            {
-                                                if !is_narrow_viewport {
-                                                    html! {
-                                                        <span class="item_container-text">{ format_time(listen_duration as f64) }</span>
-                                                    }
-                                                } else {
-                                                    html! {}
-                                                }
-                                            }
-                                            <div class="progress-bar-container">
-                                                <div class="progress-bar" style={ format!("width: {}%;", listen_duration_percentage) }></div>
-                                            </div>
-                                            <span class="item_container-text">{ formatted_duration }</span>
-                                        </div>
-                                    }
-                                } else {
-                                    html! {
-                                        <span class="item_container-text">{ formatted_duration }</span>
-                                    }
-                                }
-                            }
-                        }
-
-                    </div>
-                    {
-                        html! {
-                            <div class="flex flex-col items-center h-full w-2/12 px-2 space-y-4 md:space-y-8 button-container" style="align-self: center;">
-                                if should_show_buttons {
-                                    <button
-                                        class="item-container-button selector-button font-bold py-2 px-4 rounded-full flex items-center justify-center md:w-16 md:h-16 w-10 h-10"
-                                        onclick={on_play_pause}
-                                    >
-                                        {
-                                            if is_current_episode && is_playing {
-                                                html! { <i class="ph ph-pause-circle md:text-6xl text-4xl"></i> }
-                                            } else {
-                                                html! { <i class="ph ph-play-circle md:text-6xl text-4xl"></i> }
-                                            }
-                                        }
-                                    </button>
-                                    {
-                                        if props.podcast_added {
-                                            let page_type = "episode_layout".to_string();
-                                            html! {
-                                                <div class="hidden sm:block">
-                                                    <ContextButton episode={boxed_episode} page_type={page_type.clone()} />
-                                                </div>
-                                            }
-                                        } else {
-                                            html! {}
-                                        }
-                                    }
-                                }
-                            </div>
-                        }
-                    }
-                </div>
-                </>
+                <EpisodeListItem
+                    key={format!("{}-{}", episode.episodeid, *force_update)}
+                    episode={episode.clone()}
+                    page_type={props.page_type.clone()}
+                    drag_callbacks={ props.drag_callbacks.clone() }
+                />
             }
         })
         .collect::<Html>();
 
     let total_height = props.episodes.len() as f64 * *item_height;
-    let offset_y = start_index as f64 * *item_height;
+    let offset_y = buffered_start as f64 * *item_height;
 
     html! {
-        <>
-        <div
-            ref={container_ref}
-            class="virtual-list-container flex-grow overflow-y-auto"
-            style="height: calc(100vh - 100px);"
+        <div ref={container_ref}
+             class="virtual-list-container flex-grow overflow-y-auto"
+             style="height: calc(100vh - 100px); -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain;"
         >
-            <div style={format!("height: {}px; position: relative;", total_height)}>
-                <div style={format!("position: absolute; top: {}px; left: 0; right: 0;", offset_y)}>
-                    { visible_episodes }
-                </div>
+            // Top spacer to push content down without using transforms
+            <div style={format!("height: {}px; flex-shrink: 0;", offset_y)}></div>
+
+            // Visible episodes
+            <div>
+                { visible_episodes }
             </div>
-        </div>
-        {
-            if let Some(index) = *selected_episode_index {
-                let episode = &props.episodes[index];
-                let sanitized_description = sanitize_html_with_blank_target(&episode.description.clone().unwrap_or_default());
-                let description = sanitized_description;
-                let date_format = match_date_format(props.search_state.date_format.as_deref());
-                let datetime = parse_date(&episode.pub_date.clone().unwrap_or_default(), &props.search_state.user_tz);
-                let format_release = format_datetime(&datetime, &props.search_state.hour_preference, date_format);
 
-                // Create the callback here where we have access to index
-                let modal_shownotes_callback = {
-                    let history = props.history.clone();
-                    let search_dispatch = props.search_dispatch.clone();
-                    let podcast_link = props.podcast_link.clone();
-                    let podcast_title = props.podcast_title.clone();
-                    let episode_id = episode.episode_id.unwrap_or(0);
-                    let episode_url = episode.enclosure_url.clone().unwrap_or_default();
-                    let is_youtube = episode.is_youtube.clone();
-
-                    Callback::from(move |_: MouseEvent| {
-                        on_shownotes_click(
-                            history.clone(),
-                            search_dispatch.clone(),
-                            Some(episode_id),
-                            Some(podcast_link.clone()),
-                            Some(episode_url.clone()),
-                            Some(podcast_title.clone()),
-                            true,
-                            None,
-                            is_youtube,
-                        ).emit(MouseEvent::new("click").unwrap());
-                    })
-                };
-
-                html! {
-                    <EpisodeModal
-                        episode_id={episode.episode_id.unwrap_or(0)}
-                        episode_url={episode.enclosure_url.clone().unwrap()}
-                        episode_artwork={episode.artwork.clone().unwrap_or_default()}
-                        episode_title={episode.title.clone().unwrap_or_default()}
-                        description={description}
-                        format_release={format_release}
-                        duration={episode.duration.clone().unwrap_or_default().parse().unwrap_or(0) as i32}
-                        on_close={on_modal_close.clone()}
-                        on_show_notes={modal_shownotes_callback}
-                        listen_duration_percentage={0.0}
-                        is_youtube={episode.is_youtube.unwrap()}
-                    />
-                }
-            } else {
-                html! {}
-            }
-        }
-        </>
-    }
-}
-
-#[derive(Properties, PartialEq)]
-pub struct PersonEpisodeVirtualListProps {
-    pub episodes: Vec<PersonEpisode>,
-    pub item_height: f64,
-    pub search_state: Rc<AppState>,
-    pub search_ui_state: Rc<UIState>,
-    pub dispatch: Dispatch<UIState>,
-    pub search_dispatch: Dispatch<AppState>,
-    pub history: BrowserHistory,
-    pub server_name: Option<String>,
-    pub user_id: Option<i32>,
-    pub api_key: Option<Option<String>>,
-}
-
-#[function_component(PersonEpisodeVirtualList)]
-pub fn person_episode_virtual_list(props: &PersonEpisodeVirtualListProps) -> Html {
-    let scroll_pos = use_state(|| 0.0);
-    let container_ref = use_node_ref();
-    let container_height = use_state(|| 600.0); // Fixed height for person episodes
-    let item_height = use_state(|| 234.0); // Match existing episode item height
-
-    // Effect for scroll handling
-    {
-        let scroll_pos = scroll_pos.clone();
-        let container_ref = container_ref.clone();
-        use_effect_with(container_ref.clone(), move |container_ref| {
-            if let Some(container_element) = container_ref.cast::<HtmlElement>() {
-                let container_element_clone = container_element.clone();
-                let listener = EventListener::new(&container_element, "scroll", {
-                    let scroll_pos = scroll_pos.clone();
-                    move |_| {
-                        scroll_pos.set(container_element_clone.scroll_top() as f64);
-                    }
-                });
-
-                Box::new(move || drop(listener)) as Box<dyn FnOnce()>
-            } else {
-                Box::new(|| ()) as Box<dyn FnOnce()>
-            }
-        });
-    }
-
-    // Calculate visible range
-    let visible_start = ((*scroll_pos as f64) / (*item_height as f64)).floor() as usize;
-    let visible_count = ((*container_height as f64) / (*item_height as f64)).ceil() as usize + 1;
-    let visible_end = (visible_start + visible_count).min(props.episodes.len());
-
-    let total_height = props.episodes.len() as f64 * *item_height;
-    let offset_y = visible_start as f64 * *item_height;
-
-    html! {
-        <div
-            ref={container_ref}
-            class="virtual-list-container"
-            style={format!("height: {}px; overflow-y: auto;", *container_height)}
-        >
-            <div style={format!("height: {}px; position: relative;", total_height)}>
-                <div style={format!("transform: translateY({}px);", offset_y)}>
-                    { (visible_start..visible_end).map(|index| {
-                        let episode = &props.episodes[index];
-                        html! {
-                            <PersonEpisodeComponent
-                                key={format!("{}", episode.episodeid)}
-                                episode={episode.clone()}
-                                search_state={props.search_state.clone()}
-                                search_ui_state={props.search_ui_state.clone()}
-                                dispatch={props.dispatch.clone()}
-                                search_dispatch={props.search_dispatch.clone()}
-                                history={props.history.clone()}
-                                server_name={props.server_name.clone()}
-                                user_id={props.user_id}
-                                api_key={props.api_key.clone()}
-                            />
-                        }
-                    }).collect::<Html>() }
-                </div>
-            </div>
+            // Bottom spacer to maintain total height
+            <div style={format!("height: {}px; flex-shrink: 0;", total_height - offset_y - (buffered_end - buffered_start) as f64 * *item_height)}></div>
         </div>
     }
-}
-
-#[derive(Properties, PartialEq, Clone)]
-pub struct PersonEpisodeComponentProps {
-    pub episode: PersonEpisode,
-    pub search_state: Rc<AppState>,
-    pub search_ui_state: Rc<UIState>,
-    pub dispatch: Dispatch<UIState>,
-    pub search_dispatch: Dispatch<AppState>,
-    pub history: BrowserHistory,
-    pub server_name: Option<String>,
-    pub user_id: Option<i32>,
-    pub api_key: Option<Option<String>>,
-}
-
-#[function_component(PersonEpisodeComponent)]
-pub fn person_episode_component(props: &PersonEpisodeComponentProps) -> Html {
-    use crate::components::gen_components::{on_shownotes_click, person_episode_item};
-    use crate::components::gen_funcs::sanitize_html_with_blank_target;
-
-    let state = props.search_state.clone();
-    let audio_state = props.search_ui_state.clone();
-    let audio_dispatch = props.dispatch.clone();
-
-    // Format date
-    let date_format = match_date_format(state.date_format.as_deref());
-    let episode = &props.episode;
-    let datetime = parse_date(&episode.episodepubdate, &state.user_tz);
-    let format_release = format_datetime(&datetime, &state.hour_preference, date_format);
-
-    let is_current_episode = audio_state
-        .currently_playing
-        .as_ref()
-        .map_or(false, |current| current.episode_id == episode.episodeid);
-    let is_playing = audio_state.audio_playing.unwrap_or(false);
-
-    // Check if episode is downloaded - use the downloaded field from the episode
-    // or check against locally_downloaded_episodes for Tauri builds
-    let is_local = if episode.downloaded {
-        Some(true)
-    } else {
-        #[cfg(not(feature = "server_build"))]
-        {
-            if state
-                .locally_downloaded_episodes
-                .as_ref()
-                .map(|episodes| episodes.contains(&episode.episodeid))
-                .unwrap_or(false)
-            {
-                Some(true)
-            } else {
-                None
-            }
-        }
-        #[cfg(feature = "server_build")]
-        {
-            None
-        }
-    };
-
-    let on_play_pause = on_play_pause(
-        episode.episodeurl.clone(),
-        episode.episodetitle.clone(),
-        episode.episodedescription.clone(),
-        format_release.clone(),
-        episode.episodeartwork.clone().unwrap_or_default(),
-        episode.episodeduration,
-        episode.episodeid,
-        Some(episode.listenduration),
-        props.api_key.clone().unwrap().unwrap(),
-        props.user_id.unwrap(),
-        props.server_name.clone().unwrap(),
-        audio_dispatch.clone(),
-        audio_state.clone(),
-        is_local,
-        Some(false), // person episodes are always non-YouTube
-    );
-
-    let on_shownotes_click = on_shownotes_click(
-        props.history.clone(),
-        props.search_dispatch.clone(),
-        Some(episode.episodeid),
-        Some(episode.episodeurl.clone()),
-        Some(episode.episodeurl.clone()),
-        None,
-        false,
-        Some(true), // person_episode
-        Some(episode.is_youtube),
-    );
-
-    // Use the proper episode item component
-    person_episode_item(
-        Box::new(episode.clone()),
-        sanitize_html_with_blank_target(&episode.episodedescription),
-        false, // desc_expanded
-        &format_release,
-        on_play_pause,
-        on_shownotes_click,
-        Callback::noop(), // toggle_expanded
-        episode.episodeduration,
-        Some(episode.listenduration),
-        "people",
-        Callback::noop(),
-        false,
-        episode.episodeurl.clone(),
-        false,
-        false,            // show_modal
-        Callback::noop(), // on_modal_open
-        Callback::noop(), // on_modal_close
-        is_current_episode,
-        is_playing,
-    )
 }

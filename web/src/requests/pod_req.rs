@@ -2,6 +2,7 @@ use anyhow::{Context, Error};
 // use futures_util::stream::StreamExt;
 use crate::components::context::AppState;
 use crate::components::notification_center::TaskProgress;
+use crate::requests::episode::Episode;
 use futures::StreamExt;
 use gloo::net::websocket::WebSocketError;
 use gloo::net::websocket::{futures::WebSocket, Message};
@@ -13,61 +14,6 @@ use std::fmt;
 use wasm_bindgen::JsCast;
 use web_sys::console;
 use yewdux::Dispatch;
-
-fn bool_from_int<'de, D>(deserializer: D) -> Result<bool, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct BoolOrIntVisitor;
-
-    impl<'de> serde::de::Visitor<'de> for BoolOrIntVisitor {
-        type Value = bool;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a boolean or an integer")
-        }
-
-        fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
-            Ok(value)
-        }
-
-        fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            Ok(value != 0)
-        }
-
-        fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            Ok(value != 0)
-        }
-    }
-
-    deserializer.deserialize_any(BoolOrIntVisitor)
-}
-
-#[derive(Deserialize, Debug, PartialEq, Clone)]
-#[allow(non_snake_case)]
-#[serde(rename_all = "lowercase")]
-pub struct Episode {
-    pub podcastname: String,
-    pub episodetitle: String,
-    pub episodepubdate: String,
-    pub episodedescription: String,
-    pub episodeartwork: String,
-    pub episodeurl: String,
-    pub episodeduration: i32,
-    pub listenduration: Option<i32>,
-    pub episodeid: i32,
-    pub completed: bool,
-    pub saved: bool,
-    pub queued: bool,
-    pub downloaded: bool,
-    pub is_youtube: bool,
-}
 
 #[derive(Deserialize, Debug, PartialEq, Clone)]
 pub struct RecentEps {
@@ -150,7 +96,7 @@ pub async fn call_add_podcast(
     api_key: &Option<String>,
     _user_id: i32,
     added_podcast: &PodcastValues,
-    podcast_index_id: Option<i64>,
+    podcast_index_id: i32,
 ) -> Result<PodcastStatusResponse, Error> {
     let url = format!("{}/api/data/add_podcast", server_name);
     let api_key_ref = api_key
@@ -161,7 +107,7 @@ pub async fn call_add_podcast(
     #[derive(Serialize)]
     struct AddPodcastRequest {
         podcast_values: PodcastValues,
-        podcast_index_id: Option<i64>,
+        podcast_index_id: i32,
     }
 
     let request_body = AddPodcastRequest {
@@ -202,7 +148,7 @@ pub struct UpdatePodcastInfoRequest {
     pub author: Option<String>,
     pub artwork_url: Option<String>,
     pub website_url: Option<String>,
-    pub podcast_index_id: Option<i64>,
+    pub podcast_index_id: Option<i32>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
@@ -225,7 +171,7 @@ pub async fn call_update_podcast_info(
     author: Option<String>,
     artwork_url: Option<String>,
     website_url: Option<String>,
-    podcast_index_id: Option<i64>,
+    podcast_index_id: Option<i32>,
 ) -> Result<UpdatePodcastInfoResponse, Error> {
     let url = format!("{}/api/data/update_podcast_info", server_name);
     let api_key_ref = api_key
@@ -366,6 +312,41 @@ pub async fn call_remove_podcasts_name(
     }
 }
 
+fn bool_from_int<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct BoolOrIntVisitor;
+
+    impl<'de> serde::de::Visitor<'de> for BoolOrIntVisitor {
+        type Value = bool;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a boolean or an integer")
+        }
+
+        fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
+            Ok(value)
+        }
+
+        fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(value != 0)
+        }
+
+        fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(value != 0)
+        }
+    }
+
+    deserializer.deserialize_any(BoolOrIntVisitor)
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PodcastResponse {
     pub pods: Option<Vec<Podcast>>,
@@ -386,8 +367,8 @@ pub struct Podcast {
     pub categories: Option<HashMap<String, String>>,
     #[serde(deserialize_with = "bool_from_int")]
     pub explicit: bool,
-    #[serde(default)] // Add this line
-    pub podcastindexid: Option<i64>,
+    #[serde(default)]
+    pub podcastindexid: i32,
 }
 
 pub async fn call_get_podcasts(
@@ -452,7 +433,7 @@ pub struct PodcastExtra {
     pub categories: Option<HashMap<String, String>>,
     #[serde(deserialize_with = "bool_from_int")]
     pub explicit: bool,
-    pub podcastindexid: i64,
+    pub podcastindexid: i32,
     #[serde(default)]
     pub play_count: i64,
     #[serde(default)]
@@ -478,7 +459,7 @@ impl From<Podcast> for PodcastExtra {
             author: podcast.author,
             categories: podcast.categories,
             explicit: podcast.explicit,
-            podcastindexid: podcast.podcastindexid.unwrap_or(0),
+            podcastindexid: podcast.podcastindexid,
             play_count: 0,
             episodes_played: 0,
             oldest_episode_date: None,
@@ -500,7 +481,7 @@ impl From<PodcastExtra> for Podcast {
             author: podcast_extra.author,
             categories: podcast_extra.categories,
             explicit: podcast_extra.explicit,
-            podcastindexid: Some(podcast_extra.podcastindexid),
+            podcastindexid: podcast_extra.podcastindexid,
         }
     }
 }
@@ -762,42 +743,19 @@ pub async fn call_remove_queued_episode(
 
 #[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct QueuedEpisodesResponse {
-    pub episodes: Vec<QueuedEpisode>,
-}
-
-#[derive(Debug, Deserialize, Clone, PartialEq)]
-#[allow(non_snake_case)]
-#[serde(rename_all = "lowercase")]
-pub struct QueuedEpisode {
-    pub episodetitle: String,
-    pub podcastname: String,
-    pub episodepubdate: String,
-    pub episodedescription: String,
-    pub episodeartwork: String,
-    pub episodeurl: String,
-    #[serde(default)]
-    pub queueposition: Option<i32>,
-    pub episodeduration: i32,
-    pub queuedate: String,
-    pub listenduration: Option<i32>,
-    pub episodeid: i32,
-    pub completed: bool,
-    pub saved: bool,      // Added field
-    pub queued: bool,     // Added field
-    pub downloaded: bool, // Added field
-    pub is_youtube: bool,
+    pub episodes: Vec<Episode>,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct DataResponse {
-    pub data: Vec<QueuedEpisode>,
+    pub data: Vec<Episode>,
 }
 
 pub async fn call_get_queued_episodes(
     server_name: &str,
     api_key: &Option<String>,
     user_id: &i32,
-) -> Result<Vec<QueuedEpisode>, anyhow::Error> {
+) -> Result<Vec<Episode>, anyhow::Error> {
     // Append the user_id as a query parameter
     let url = format!(
         "{}/api/data/get_queued_episodes?user_id={}",
@@ -873,33 +831,12 @@ pub async fn call_reorder_queue(
 
 #[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct SavedEpisodesResponse {
-    pub episodes: Vec<SavedEpisode>,
-}
-
-#[derive(Debug, Deserialize, Clone, PartialEq)]
-#[allow(non_snake_case)]
-#[serde(rename_all = "lowercase")]
-pub struct SavedEpisode {
-    pub episodetitle: String,
-    pub podcastname: String,
-    pub episodepubdate: String,
-    pub episodedescription: String,
-    pub episodeartwork: String,
-    pub episodeurl: String,
-    pub episodeduration: i32,
-    pub listenduration: Option<i32>,
-    pub episodeid: i32,
-    pub websiteurl: String,
-    pub completed: bool,
-    pub saved: bool,      // Added field
-    pub queued: bool,     // Added field
-    pub downloaded: bool, // Added field
-    pub is_youtube: bool,
+    pub episodes: Vec<Episode>,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct SavedDataResponse {
-    pub saved_episodes: Vec<SavedEpisode>,
+    pub saved_episodes: Vec<Episode>,
 }
 
 #[allow(dead_code)]
@@ -907,7 +844,7 @@ pub async fn call_get_saved_episodes(
     server_name: &str,
     api_key: &Option<String>,
     user_id: &i32,
-) -> Result<Vec<SavedEpisode>, anyhow::Error> {
+) -> Result<Vec<Episode>, anyhow::Error> {
     // Append the user_id as a query parameter
     let url = format!("{}/api/data/saved_episode_list/{}", server_name, user_id);
 
@@ -929,8 +866,6 @@ pub async fn call_get_saved_episodes(
     }
 
     let response_text = response.text().await?;
-    // let response_text = response.text().await?;
-
     let response_data: SavedDataResponse = serde_json::from_str(&response_text)?;
     Ok(response_data.saved_episodes)
 }
@@ -1034,32 +969,9 @@ pub async fn call_remove_saved_episode(
 }
 
 // History calls
-
-#[derive(Debug, Deserialize, PartialEq, Clone)]
-pub struct HistoryEpisodesResponse {
-    pub episodes: Vec<HistoryEpisode>,
-}
-
-#[derive(Debug, Deserialize, Clone, PartialEq)]
-#[allow(non_snake_case)]
-#[serde(rename_all = "lowercase")]
-pub struct HistoryEpisode {
-    pub episodetitle: String,
-    pub podcastname: String,
-    pub episodepubdate: String,
-    pub episodedescription: String,
-    pub episodeartwork: String,
-    pub episodeurl: String,
-    pub episodeduration: i32,
-    pub listenduration: Option<i32>,
-    pub episodeid: i32,
-    pub completed: bool,
-    pub is_youtube: bool,
-}
-
 #[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct HistoryDataResponse {
-    pub data: Vec<HistoryEpisode>,
+    pub data: Vec<Episode>,
 }
 
 #[allow(dead_code)]
@@ -1067,7 +979,7 @@ pub async fn call_get_user_history(
     server_name: &str,
     api_key: &Option<String>,
     user_id: &i32,
-) -> Result<Vec<HistoryEpisode>, anyhow::Error> {
+) -> Result<Vec<Episode>, anyhow::Error> {
     // Append the user_id as a query parameter
     let url = format!("{}/api/data/user_history/{}", server_name, user_id);
 
@@ -1132,43 +1044,20 @@ pub async fn call_add_history(
 
 #[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct EpisodeDownloadResponse {
-    pub episodes: Vec<EpisodeDownload>,
-}
-
-#[derive(Debug, Deserialize, Clone, PartialEq)]
-#[allow(non_snake_case)]
-#[serde(rename_all = "lowercase")]
-pub struct EpisodeDownload {
-    pub episodetitle: String,
-    pub podcastname: String,
-    pub episodepubdate: String,
-    pub episodedescription: String,
-    pub episodeartwork: String,
-    pub episodeurl: String,
-    pub episodeduration: i32,
-    pub listenduration: Option<i32>,
-    pub episodeid: i32,
-    pub downloadedlocation: Option<String>,
-    pub podcastid: i32,
-    pub podcastindexid: Option<i64>,
-    pub completed: bool,
-    pub queued: bool,     // Remove #[serde(rename = "is_queued")]
-    pub saved: bool,      // Remove #[serde(rename = "is_saved")]
-    pub downloaded: bool, // Remove #[serde(rename = "is_downloaded")]
-    pub is_youtube: bool,
+    pub episodes: Vec<Episode>,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct DownloadDataResponse {
     #[serde(rename = "downloaded_episodes")]
-    pub episodes: Vec<EpisodeDownload>,
+    pub episodes: Vec<Episode>,
 }
 
 pub async fn call_get_episode_downloads(
     server_name: &str,
     api_key: &Option<String>,
     user_id: &i32,
-) -> Result<Vec<EpisodeDownload>, anyhow::Error> {
+) -> Result<Vec<Episode>, anyhow::Error> {
     // Append the user_id as a query parameter
     let url = format!(
         "{}/api/data/download_episode_list?user_id={}",
@@ -1360,30 +1249,6 @@ pub async fn call_remove_downloaded_episode(
 }
 
 // Get Single Epsiode
-
-#[derive(Debug, Deserialize, Default, Serialize, Clone, PartialEq)]
-#[allow(non_snake_case)]
-#[serde(default)]
-pub struct EpisodeInfo {
-    pub episodetitle: String,
-    pub podcastname: String,
-    pub podcastid: i32,
-    pub podcastindexid: Option<i64>,
-    pub feedurl: String,
-    pub episodepubdate: String,
-    pub episodedescription: String,
-    pub episodeartwork: String,
-    pub episodeurl: String,
-    pub episodeduration: i32,
-    pub listenduration: Option<i32>,
-    pub episodeid: i32,
-    pub completed: bool,
-    pub is_queued: bool,
-    pub is_saved: bool,
-    pub is_downloaded: bool,
-    pub is_youtube: bool,
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EpisodeRequest {
     pub episode_id: i32,
@@ -1394,17 +1259,12 @@ pub struct EpisodeRequest {
     pub is_youtube: bool,
 }
 
-#[derive(Debug, Deserialize, Clone, PartialEq)]
-pub struct EpisodeMetadataResponse {
-    pub episode: EpisodeInfo,
-}
-
 #[allow(dead_code)]
 pub async fn call_get_episode_metadata(
     server_name: &str,
     api_key: Option<String>,
     episode_request: &EpisodeRequest,
-) -> Result<EpisodeInfo, anyhow::Error> {
+) -> Result<Episode, anyhow::Error> {
     let url = format!("{}/api/data/get_episode_metadata", server_name);
 
     let api_key_ref = api_key
@@ -1430,9 +1290,15 @@ pub async fn call_get_episode_metadata(
 
     let response_text = response.text().await?;
 
-    let response_data: EpisodeMetadataResponse = serde_json::from_str(&response_text)
+    #[derive(Deserialize)]
+    struct Response {
+        episode: Episode,
+    }
+
+    let resp: Response = serde_json::from_str(&response_text)
         .map_err(|e| anyhow::Error::msg(format!("Deserialization Error: {}", e)))?;
-    Ok(response_data.episode)
+
+    Ok(resp.episode)
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
@@ -1924,7 +1790,7 @@ pub async fn call_get_podcast_id_from_ep_name(
     Ok(response_data.podcast_id)
 }
 
-#[derive(Deserialize, Debug, Clone, Serialize)]
+#[derive(Deserialize, Debug, Clone, Serialize, PartialEq)]
 pub struct PodcastDetails {
     pub podcastid: i32,
     pub podcastname: String,
@@ -1938,7 +1804,7 @@ pub struct PodcastDetails {
     pub explicit: bool,
     pub userid: i32,
     #[serde(default)] // Add this to handle null more gracefully
-    pub podcastindexid: Option<i64>,
+    pub podcastindexid: i32,
     #[serde(rename = "isyoutubechannel")]
     pub is_youtube: bool,
 }
@@ -1954,7 +1820,7 @@ pub async fn call_get_podcast_details(
     server_name: &str,
     api_key: &str,
     user_id: i32,
-    podcast_id: &i32,
+    podcast_id: i32,
 ) -> Result<PodcastDetails, Error> {
     let url = format!(
         "{}/api/data/get_podcast_details?user_id={}&podcast_id={}",
@@ -3190,7 +3056,7 @@ pub struct EpisodeMetadata {
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct SharedEpisodeResponse {
-    pub episode: EpisodeMetadata,
+    pub episode: Episode,
 }
 
 #[allow(dead_code)]
@@ -3648,9 +3514,12 @@ pub async fn call_update_episode_duration(
     request_data: &UpdateEpisodeDurationRequest,
 ) -> Result<String, Error> {
     let url = format!("{}/api/data/update_episode_duration", server_name);
-    let api_key_ref = api_key.as_deref().ok_or_else(|| anyhow::Error::msg("API key is missing"))?;
+    let api_key_ref = api_key
+        .as_deref()
+        .ok_or_else(|| anyhow::Error::msg("API key is missing"))?;
 
-    let request_body = serde_json::to_string(request_data).map_err(|e| anyhow::Error::msg(format!("Serialization Error: {}", e)))?;
+    let request_body = serde_json::to_string(request_data)
+        .map_err(|e| anyhow::Error::msg(format!("Serialization Error: {}", e)))?;
 
     let response = Request::post(&url)
         .header("Api-Key", api_key_ref)
@@ -3660,10 +3529,14 @@ pub async fn call_update_episode_duration(
         .await?;
 
     if response.ok() {
-        let response_body: UpdateEpisodeDurationResponse = response.json().await.map_err(|e| anyhow::Error::new(e))?;
+        let response_body: UpdateEpisodeDurationResponse =
+            response.json().await.map_err(|e| anyhow::Error::new(e))?;
         Ok(response_body.detail)
     } else {
-        let error_text = response.text().await.unwrap_or_else(|_| String::from("Failed to read error message"));
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| String::from("Failed to read error message"));
         Err(anyhow::Error::msg(format!(
             "Failed to update episode duration: {} - {}",
             response.status_text(),
@@ -3676,7 +3549,7 @@ pub async fn call_update_episode_duration(
 pub struct HomePodcast {
     pub podcastid: i32,
     pub podcastname: String,
-    pub podcastindexid: Option<i64>,
+    pub podcastindexid: i32,
     pub artworkurl: Option<String>,
     pub author: Option<String>,
     pub categories: Option<HashMap<String, String>>,
@@ -3691,32 +3564,9 @@ pub struct HomePodcast {
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
-pub struct HomeEpisode {
-    pub episodeid: i32,
-    pub podcastid: i32,
-    pub episodetitle: String,
-    pub episodedescription: String,
-    pub episodeurl: String,
-    pub episodeartwork: String,
-    pub episodepubdate: String,
-    pub episodeduration: i32,
-    pub completed: bool,
-    pub podcastname: String,
-    pub is_youtube: bool,
-    #[serde(default)]
-    pub listenduration: Option<i32>,
-    #[serde(default)]
-    pub saved: bool,
-    #[serde(default)]
-    pub queued: bool,
-    #[serde(default)]
-    pub downloaded: bool,
-}
-
-#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct HomeOverview {
-    pub recent_episodes: Vec<HomeEpisode>,
-    pub in_progress_episodes: Vec<HomeEpisode>,
+    pub recent_episodes: Vec<Episode>,
+    pub in_progress_episodes: Vec<Episode>,
     pub top_podcasts: Vec<HomePodcast>,
     pub saved_count: i32,
     pub downloaded_count: i32,

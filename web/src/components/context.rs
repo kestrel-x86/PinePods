@@ -1,17 +1,18 @@
 use crate::components::audio::AudioPlayerProps;
 use crate::components::notification_center::TaskProgress;
-use crate::components::podcast_layout::ClickedFeedURL;
-use crate::components::podcasts::PodcastLayout;
+use crate::pages::podcast_layout::ClickedFeedURL;
+use crate::pages::podcasts::PodcastLayout;
+use crate::requests::episode::Episode;
 use crate::requests::login_requests::AddUserRequest;
 use crate::requests::login_requests::GetUserDetails;
 use crate::requests::login_requests::LoginServerRequest;
 use crate::requests::login_requests::{GetApiDetails, TimeZoneInfo};
 use crate::requests::pod_req::PodcastResponseExtra;
+
 use crate::requests::pod_req::{
-    Chapter, Episode, EpisodeDownloadResponse, EpisodeMetadataResponse, Funding,
-    HistoryDataResponse, HomeOverview, Person, Playlist, PlaylistInfo, Podcast, PodcastResponse,
-    PodrollItem, QueuedEpisodesResponse, RecentEps, RefreshProgress, SavedEpisodesResponse,
-    SharedEpisodeResponse, Transcript, Value,
+    Chapter, EpisodeDownloadResponse, Funding, HistoryDataResponse, HomeOverview, Person, Playlist,
+    PlaylistInfo, Podcast, PodcastResponse, PodrollItem, QueuedEpisodesResponse, RecentEps,
+    RefreshProgress, SavedEpisodesResponse, SharedEpisodeResponse, Transcript, Value,
 };
 use crate::requests::search_pods::{
     PeopleFeedResult, PodcastFeedResult, PodcastSearchResult, SearchResponse, YouTubeChannel,
@@ -103,11 +104,12 @@ pub struct AppState {
     pub people_feed_results: Option<PeopleFeedResult>,
     pub server_feed_results: Option<RecentEps>,
     pub queued_episodes: Option<QueuedEpisodesResponse>,
-    pub saved_episodes: Option<SavedEpisodesResponse>,
+    #[serde(default)]
+    pub saved_episodes: Vec<Episode>,
     pub episode_history: Option<HistoryDataResponse>,
-    pub downloaded_episodes: Option<EpisodeDownloadResponse>,
+    #[serde(default)]
+    pub downloaded_episodes: DownloadedEpisodeRecords,
     pub search_episodes: Option<SearchResponse>,
-    pub episodes: Option<Episode>,
     pub clicked_podcast_info: Option<ClickedFeedURL>,
     pub pods: Option<Podcast>,
     pub podcast_feed_return: Option<PodcastResponse>,
@@ -118,14 +120,15 @@ pub struct AppState {
     #[serde(default)]
     pub expanded_descriptions: HashSet<String>,
     pub selected_theme: Option<String>,
-    pub fetched_episode: Option<EpisodeMetadataResponse>,
+    pub fetched_episode: Option<Episode>,
     pub shared_fetched_episode: Option<SharedEpisodeResponse>,
     pub selected_episode_id: Option<i32>,
     pub selected_episode_url: Option<String>,
     pub selected_episode_audio_url: Option<String>,
     pub selected_podcast_title: Option<String>,
     pub person_episode: Option<bool>,
-    pub selected_is_youtube: Option<bool>,
+    #[serde(default)]
+    pub selected_is_youtube: bool,
     pub add_user_request: Option<AddUserRequest>,
     pub time_zone_setup: Option<TimeZoneInfo>,
     pub add_settings_user_reqeust: Option<AddSettingsUserRequest>,
@@ -138,10 +141,7 @@ pub struct AppState {
     pub date_format: Option<String>,
     pub podcast_added: Option<bool>,
     pub completed_episodes: Option<Vec<i32>>,
-    pub saved_episode_ids: Option<Vec<i32>>,
     pub queued_episode_ids: Option<Vec<i32>>,
-    pub downloaded_episode_ids: Option<Vec<i32>>,
-    pub locally_downloaded_episodes: Option<Vec<i32>>,
     pub podcast_layout: Option<PodcastLayout>,
     pub refresh_progress: Option<RefreshProgress>,
     pub youtube_search_results: Option<YouTubeSearchResults>,
@@ -154,6 +154,129 @@ pub struct AppState {
     pub current_playlist_info: Option<PlaylistInfo>,
     pub current_playlist_episodes: Option<Vec<Episode>>,
     pub active_tasks: Option<Vec<TaskProgress>>,
+}
+
+impl AppState {
+    pub fn saved_episode_ids(&self) -> impl Iterator<Item = i32> + '_ {
+        self.saved_episodes.iter().map(|e| e.episodeid)
+    }
+}
+
+/// A collection of records for episodes downloaded either locally or on the server.
+/// Mutating this collection does not affect the filesystem and episodes will need
+/// to be downloaded or deleted to match changes made here.
+#[derive(Default, Deserialize, Clone, PartialEq, Debug)]
+pub struct DownloadedEpisodeRecords {
+    episodes: Vec<Episode>,
+    local_ids: HashSet<i32>,
+    server_ids: HashSet<i32>,
+}
+
+#[allow(dead_code)]
+impl DownloadedEpisodeRecords {
+    /// Creates an iterator of all downloaded &Episode
+    pub fn episodes(&self) -> impl Iterator<Item = &Episode> + '_ {
+        self.episodes.iter()
+    }
+
+    /// Creates an unordered iterator over ids for episodes downloaded locally
+    pub fn local_ids(&self) -> impl Iterator<Item = i32> + '_ {
+        self.local_ids.iter().map(|id| id.clone())
+    }
+
+    /// Creates an unordered iterator over ids for episodes downloaded to the server
+    pub fn server_ids(&self) -> impl Iterator<Item = i32> + '_ {
+        self.server_ids.iter().map(|id| id.clone())
+    }
+
+    /// Checks if episode is downloaded to the server
+    pub fn is_server_download(&self, id: i32) -> bool {
+        self.server_ids.contains(&id)
+    }
+
+    /// Checks if episode is downloaded to the server
+    pub fn is_local_download(&self, id: i32) -> bool {
+        self.local_ids.contains(&id)
+    }
+
+    /// Checks if episode is downloaded to either the server or locally
+    pub fn is_download(&self, id: i32) -> bool {
+        return self.is_local_download(id) || self.is_server_download(id);
+    }
+
+    /// Add a record of an Episode downloaded locally
+    pub fn push_local(&mut self, episode: Episode) {
+        let id = episode.episodeid;
+        // only add Episode if the id doesn't exist in either set
+        if !self.server_ids.contains(&episode.episodeid)
+            && !self.local_ids.contains(&episode.episodeid)
+        {
+            self.episodes.push(episode);
+        }
+
+        self.local_ids.insert(id);
+    }
+
+    /// Add a record of an Episode downloaded to the server
+    pub fn push_server(&mut self, episode: Episode) {
+        let id = episode.episodeid;
+        // only add Episode if the id doesn't exist in either set
+        if !self.server_ids.contains(&episode.episodeid)
+            && !self.local_ids.contains(&episode.episodeid)
+        {
+            self.episodes.push(episode);
+        }
+
+        self.server_ids.insert(id);
+    }
+
+    /// Remove the record of an Episode downloaded locally
+    pub fn remove_local(&mut self, id: i32) {
+        self.local_ids.remove(&id);
+
+        // remove the ep if it isn't also downloaded on the server
+        if !self.server_ids.contains(&id) {
+            self.episodes.retain(|ep| ep.episodeid != id);
+        }
+    }
+
+    /// Remove the record of an Episode downloaded on the server
+    pub fn remove_server(&mut self, id: i32) {
+        self.server_ids.remove(&id);
+
+        // remove the ep if it isn't also downloaded locally
+        if !self.local_ids.contains(&id) {
+            self.episodes.retain(|ep| ep.episodeid != id);
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.episodes.clear();
+        self.server_ids.clear();
+        self.local_ids.clear();
+    }
+
+    /// Remove all records of episodes downloaded locally
+    pub fn clear_local(&mut self) {
+        for id in self.local_ids.drain() {
+            if !self.server_ids.contains(&id) {
+                self.episodes.retain(|ep| ep.episodeid != id);
+            }
+        }
+    }
+
+    /// Remove all records of episodes downloaded on the server
+    pub fn clear_server(&mut self) {
+        for id in self.local_ids.drain() {
+            if !self.server_ids.contains(&id) {
+                self.episodes.retain(|ep| ep.episodeid != id);
+            }
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.episodes.len()
+    }
 }
 
 #[derive(Default, Deserialize, Clone, PartialEq, Store, Debug)]

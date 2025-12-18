@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -69,10 +70,53 @@ type EpisodeAction struct {
 	Episode   string      `json:"episode"`
 	Device    string      `json:"device,omitempty"`
 	Action    string      `json:"action"`
-	Timestamp interface{} `json:"timestamp"` // Accept any type
+	Timestamp interface{} `json:"-"` // Accept any type internally, but customize JSON output
 	Started   *int        `json:"started,omitempty"`
 	Position  *int        `json:"position,omitempty"`
 	Total     *int        `json:"total,omitempty"`
+}
+
+// MarshalJSON customizes JSON serialization to format timestamp as ISO 8601 string
+// AntennaPod expects format: "yyyy-MM-dd'T'HH:mm:ss" (without Z timezone indicator)
+func (e EpisodeAction) MarshalJSON() ([]byte, error) {
+	type Alias EpisodeAction
+
+	// Convert timestamp to Unix seconds
+	var unixTimestamp int64
+	switch t := e.Timestamp.(type) {
+	case int64:
+		unixTimestamp = t
+	case int:
+		unixTimestamp = int64(t)
+	case float64:
+		unixTimestamp = int64(t)
+	default:
+		// Default to current time if timestamp is invalid
+		unixTimestamp = time.Now().Unix()
+	}
+
+	// Format as ISO 8601 without timezone (AntennaPod requirement)
+	timestampStr := time.Unix(unixTimestamp, 0).UTC().Format("2006-01-02T15:04:05")
+
+	return json.Marshal(&struct {
+		Podcast   string `json:"podcast"`
+		Episode   string `json:"episode"`
+		Device    string `json:"device,omitempty"`
+		Action    string `json:"action"`
+		Timestamp string `json:"timestamp"`
+		Started   *int   `json:"started,omitempty"`
+		Position  *int   `json:"position,omitempty"`
+		Total     *int   `json:"total,omitempty"`
+	}{
+		Podcast:   e.Podcast,
+		Episode:   e.Episode,
+		Device:    e.Device,
+		Action:    e.Action,
+		Timestamp: timestampStr,
+		Started:   e.Started,
+		Position:  e.Position,
+		Total:     e.Total,
+	})
 }
 
 // EpisodeActionResponse represents a response to episode action upload

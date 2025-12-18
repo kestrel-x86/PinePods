@@ -422,8 +422,8 @@ impl TaskSpawner {
                     if total_size > 0 {
                         let progress = 25.0 + (downloaded as f64 / total_size as f64) * 65.0; // 25% to 90%
                         
-                        // Only send WebSocket updates every 5% to avoid overwhelming the browser
-                        if progress - last_reported_progress >= 5.0 || downloaded == total_size {
+                        // Only send WebSocket updates every 10% to avoid overwhelming the browser
+                        if progress - last_reported_progress >= 10.0 || downloaded == total_size {
                             let status_message = format!("Downloading {}", episode_title);
                             task_manager.update_task_progress_with_details(
                                 &task_id_clone, 

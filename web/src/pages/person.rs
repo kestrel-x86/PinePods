@@ -1,10 +1,9 @@
-use super::app_drawer::App_drawer;
+use crate::components::app_drawer::App_drawer;
 use crate::components::audio::on_play_pause;
 use crate::components::audio::AudioPlayer;
 use crate::components::click_events::create_on_title_click;
 use crate::components::context::ExpandedDescriptions;
 use crate::components::context::{AppState, UIState};
-use crate::components::episodes_layout::AppStateMsg as EpisodeMsg;
 use crate::components::gen_components::on_shownotes_click;
 use crate::components::gen_components::{FallbackImage, Search_nav, UseScrollToTop};
 use crate::components::gen_funcs::format_error_message;
@@ -13,6 +12,7 @@ use crate::components::gen_funcs::{
     strip_images_from_html, truncate_description, unix_timestamp_to_datetime_string,
 };
 use crate::components::safehtml::SafeHtml;
+use crate::pages::episode_layout::AppStateMsg as EpisodeMsg;
 use crate::requests::people_req::{
     call_get_person_subscriptions, call_subscribe_to_person, call_unsubscribe_from_person,
 };
@@ -76,7 +76,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
     let i18n_podcast_added = i18n.t("person.podcast_successfully_added").to_string();
     let i18n_error_adding_podcast = i18n.t("person.error_adding_podcast").to_string();
 
-    let (state, dispatch) = use_store::<AppState>();
+    let (app_state, dispatch) = use_store::<AppState>();
     let (desc_state, desc_dispatch) = use_store::<ExpandedDescriptions>();
     let person_ids = use_state(|| HashMap::<String, i32>::new());
     let (post_state, _post_dispatch) = use_store::<AppState>();
@@ -124,7 +124,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
     }
     // Initialize the state for all podcasts
     let added_podcasts_state = use_state(|| {
-        state
+        app_state
             .podcast_feed_return
             .as_ref()
             .map_or(HashSet::new(), |feed| {
@@ -205,7 +205,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
         let user_id = user_id.clone();
         let server_name = server_name.clone();
         let dispatch = dispatch.clone();
-        let state_callback = state.clone();
+        let state_callback = app_state.clone();
 
         Callback::from(move |podcast_id: i32| {
             dispatch.reduce_mut(|state| state.is_loading = Some(true));
@@ -299,7 +299,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                             &api_key_callback.unwrap(),
                             user_id_callback.unwrap(),
                             &podcast_values,
-                            Some(0),
+                            0,
                         )
                         .await
                         {
@@ -620,7 +620,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                     )}>
                         {
 
-                            if let Some(podcasts) = state.podcast_feed_return.clone() {
+                            if let Some(podcasts) = app_state.podcast_feed_return.clone() {
                                 let int_podcasts = podcasts.clone();
                                 if let Some(pods) = int_podcasts.pods.clone() {
                                     if pods.is_empty() {
@@ -662,7 +662,8 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                                             server_name_iter,
                                             api_key_iter,
                                             &history,
-                                            podcast.podcastindexid.clone().unwrap(),
+                                            podcast.podcastid,
+                                            podcast.podcastindexid.clone(),
                                             podcast.podcastname.clone(),
                                             podcast.feedurl.clone(),
                                             podcast.description.clone().unwrap_or_else(|| i18n.t("person.no_description_provided").to_string()),
@@ -802,7 +803,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                         if *episodes_expanded { "max-h-full opacity-100" } else { "max-h-0 opacity-0" }
                     )}>
                         {
-                        if let Some(results) = &state.people_feed_results {
+                        if let Some(results) = &app_state.people_feed_results {
                             html! {
                                 <div>
                                     { for results.items.iter().map(|episode| {
@@ -813,13 +814,14 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                                         let search_state_clone = post_state.clone(); // Clone search_state
 
                                         // Clone the variables outside the closure
-                                        let podcast_link_clone = episode.feedUrl.clone().unwrap_or_default();
-                                        let podcast_title = episode.feedTitle.clone().unwrap_or_default();
-                                        let episode_url_clone = episode.enclosureUrl.clone().unwrap_or_default();
-                                        let episode_title_clone = episode.title.clone().unwrap_or_default();
-                                        let episode_description_clone = episode.description.clone().unwrap_or_default();
-                                        let episode_pubdate_clone = episode.datePublished.clone().unwrap_or_default();
-                                        let episode_artwork_clone = episode.feedImage.clone().unwrap_or_default();                                        let episode_duration_clone = episode.duration.clone().unwrap_or_default();
+                                        let podcast_link_clone = episode.feedurl.clone();
+                                        let podcast_title = episode.podcastname.clone();
+                                        let episode_url_clone = episode.episodeurl.clone();
+                                        let episode_title_clone = episode.episodetitle.clone();
+                                        let episode_description_clone = episode.episodedescription.clone();
+                                        let episode_pubdate_clone = episode.episodepubdate.clone();
+                                        let episode_artwork_clone = episode.artworkurl.clone();
+                                             let episode_duration_clone = episode.episodeduration;
 
                                         let episode_id_clone = 0;
                                         let mut db_added = false;
@@ -837,17 +839,17 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                                             .as_ref()
                                             .map_or(false, |current| {
                                                 // Compare both title and URL for uniqueness since we don't have IDs
-                                                current.title == episode.title.clone().unwrap_or_default() &&
-                                                current.src == episode.enclosureUrl.clone().unwrap_or_default()
+                                                current.title == episode.episodetitle.clone() &&
+                                                current.src == episode.episodeurl.clone()
                                             });
 
                                         let is_playing = state.audio_playing.unwrap_or(false);
 
                                         let is_expanded = post_state.expanded_descriptions.contains(
-                                            &episode.guid.clone().unwrap()
+                                            &episode.guid.clone()
                                         );
 
-                                        let sanitized_description = sanitize_html_with_blank_target(&episode.description.clone().unwrap_or_default());
+                                        let sanitized_description = sanitize_html_with_blank_target(&episode.episodedescription.clone());
                                         let (description, _is_truncated) = if is_expanded {
                                             (sanitized_description, false)
                                         } else {
@@ -857,7 +859,7 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                                         let search_state_toggle = search_state_clone.clone();
                                         let toggle_expanded = {
                                             let search_dispatch_clone = search_dispatch.clone();
-                                            let episode_guid = episode.guid.clone().unwrap();
+                                            let episode_guid = episode.guid.clone();
                                             Callback::from(move |_: MouseEvent| {
                                                 let guid_clone = episode_guid.clone();
                                                 let search_dispatch_call = search_dispatch_clone.clone();
@@ -871,28 +873,20 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                                             })
                                         };
 
-                                        let formatted_date = unix_timestamp_to_datetime_string(episode_pubdate_clone);
+                                        let formatted_date = episode.episodepubdate.clone();
                                         let date_format = match_date_format(search_state_clone.date_format.as_deref());
                                         let datetime = parse_date(&formatted_date, &search_state_clone.user_tz);
                                         let format_release = format!("{}", format_datetime(&datetime, &search_state_clone.hour_preference, date_format));
                                         let formatted_duration = format_time(episode_duration_clone.into());
 
                                         let on_play_pause = on_play_pause(
-                                            episode_url_clone.clone(),
-                                            episode_title_clone.clone(),
-                                            episode_description_clone.clone(),
-                                            formatted_duration.clone(),
-                                            episode_artwork_clone.clone(),
-                                            episode_duration_clone,
-                                            episode_id_clone.clone(),
-                                            Some(0),
+                                            episode.clone(),
                                             api_key_play.unwrap().unwrap(),
                                             user_id_play.unwrap(),
                                             server_name_play.unwrap(),
                                             dispatch.clone(),
                                             audio_state.clone(),
-                                            None,
-                                            Some(false),
+                                            app_state.clone(),
                                         );
 
                                         let description_class = if is_expanded {
@@ -908,13 +902,13 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
                                         html! {
                                             <div class="item-container flex items-center mb-4 shadow-md rounded-lg">
                                                 <img
-                                                    src={episode.feedImage.clone().unwrap_or_default()}
-                                                    alt={format!("{} {}", &i18n.t("person.cover_for"), &episode.title.clone().unwrap_or_default())}
+                                                    src={episode.artworkurl.clone()}
+                                                    alt={format!("{} {}", &i18n.t("person.cover_for"), &episode.episodetitle.clone()) }
                                                     class="episode-image"/>
                                                 <div class="flex flex-col p-4 space-y-2 flex-grow md:w-7/12">
                                                     <p class="item_container-text episode-title font-semibold"
-                                                    onclick={on_shownotes_click(history_clone.clone(), search_dispatch.clone(), Some(episode_id_for_ep_item), Some(podcast_link_clone), Some(shownotes_episode_url), Some(podcast_title), db_added, None, Some(false))}
-                                                    >{ &episode.title.clone().unwrap_or_default() }</p>
+                                                    onclick={on_shownotes_click(history_clone.clone(), search_dispatch.clone(), episode_id_for_ep_item, podcast_link_clone, shownotes_episode_url, podcast_title, db_added, false, false)}
+                                                    >{ &episode.episodetitle.clone() }</p>
                                                     // <p class="text-gray-600">{ &episode.description.clone().unwrap_or_default() }</p>
                                                     {
                                                         html! {
@@ -987,7 +981,23 @@ pub fn person(PersonProps { name }: &PersonProps) -> Html {
 
                 {
                     if let Some(audio_props) = &audio_state.currently_playing {
-                        html! { <AudioPlayer src={audio_props.src.clone()} title={audio_props.title.clone()} description={audio_props.description.clone()} release_date={audio_props.release_date.clone()} artwork_url={audio_props.artwork_url.clone()} duration={audio_props.duration.clone()} episode_id={audio_props.episode_id.clone()} duration_sec={audio_props.duration_sec.clone()} start_pos_sec={audio_props.start_pos_sec.clone()} end_pos_sec={audio_props.end_pos_sec.clone()} offline={audio_props.offline.clone()} is_youtube={audio_props.is_youtube.clone()} /> }
+                        html! {
+                            <AudioPlayer
+                                episode={audio_props.episode.clone()}
+                                src={audio_props.src.clone()}
+                                title={audio_props.title.clone()}
+                                description={audio_props.description.clone()}
+                                release_date={audio_props.release_date.clone()}
+                                artwork_url={audio_props.artwork_url.clone()}
+                                duration={audio_props.duration.clone()}
+                                episode_id={audio_props.episode_id.clone()}
+                                duration_sec={audio_props.duration_sec.clone()}
+                                start_pos_sec={audio_props.start_pos_sec.clone()}
+                                end_pos_sec={audio_props.end_pos_sec.clone()}
+                                offline={audio_props.offline.clone()}
+                                is_youtube={audio_props.is_youtube.clone()}
+                            />
+                        }
                     } else {
                         html! {}
                     }

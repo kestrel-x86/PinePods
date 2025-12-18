@@ -1,16 +1,19 @@
-use super::app_drawer::App_drawer;
-use super::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
-use super::routes::Route;
+use crate::components::app_drawer::App_drawer;
 use crate::components::audio::on_play_pause;
 use crate::components::audio::AudioPlayer;
 use crate::components::click_events::create_on_title_click;
 use crate::components::context::{AppState, UIState};
+use crate::components::context_menu_button::ContextMenuButton;
+use crate::components::episode_list_item::EpisodeListItem;
 use crate::components::gen_components::on_shownotes_click;
-use crate::components::gen_components::ContextButton;
-use crate::components::gen_components::EpisodeTrait;
+use crate::components::gen_components::{empty_message, FallbackImage, Search_nav, UseScrollToTop};
 use crate::components::gen_funcs::{format_datetime, format_time, match_date_format, parse_date};
-use crate::requests::pod_req;
-use crate::requests::pod_req::{HomeEpisode, Playlist};
+use crate::components::loading::Loading;
+use crate::pages::routes::Route;
+use crate::requests::episode::Episode;
+use crate::requests::pod_req::Playlist;
+use crate::requests::pod_req::{self};
+
 use i18nrs::yew::use_translation;
 use yew::prelude::*;
 use yew_router::history::{BrowserHistory, History};
@@ -129,10 +132,10 @@ pub fn home() -> Html {
                                     .map(|ep| ep.episodeid)
                                     .collect();
 
-                                let saved_episode_ids: Vec<i32> = all_episodes
+                                let saved_episodes: Vec<Episode> = all_episodes
                                     .clone()
                                     .filter(|ep| ep.saved)
-                                    .map(|ep| ep.episodeid)
+                                    .map(|e| e.to_owned())
                                     .collect();
 
                                 let queued_episode_ids: Vec<i32> = all_episodes
@@ -141,10 +144,9 @@ pub fn home() -> Html {
                                     .map(|ep| ep.episodeid)
                                     .collect();
 
-                                let downloaded_episode_ids: Vec<i32> = all_episodes
-                                    .clone()
+                                let downloaded_episodes: Vec<Episode> = all_episodes
                                     .filter(|ep| ep.downloaded)
-                                    .map(|ep| ep.episodeid)
+                                    .map(|ep| ep.clone())
                                     .collect();
 
                                 effect_dispatch.reduce_mut(move |state| {
@@ -152,9 +154,12 @@ pub fn home() -> Html {
 
                                     // Update state collections with merged data
                                     state.completed_episodes = Some(completed_episode_ids);
-                                    state.saved_episode_ids = Some(saved_episode_ids);
+                                    state.saved_episodes = saved_episodes;
                                     state.queued_episode_ids = Some(queued_episode_ids);
-                                    state.downloaded_episode_ids = Some(downloaded_episode_ids);
+                                    state.downloaded_episodes.clear_server();
+                                    for ep in downloaded_episodes {
+                                        state.downloaded_episodes.push_server(ep);
+                                    }
                                 });
                                 loading.set(false);
                             }
@@ -213,14 +218,9 @@ pub fn home() -> Html {
             <UseScrollToTop />
 
             if *loading {
-                <div class="loading-animation">
-                    <div class="frame1"></div>
-                    <div class="frame2"></div>
-                    <div class="frame3"></div>
-                    <div class="frame4"></div>
-                    <div class="frame5"></div>
-                    <div class="frame6"></div>
-                </div>
+                {
+                    html! { <Loading/> }
+                }
             } else {
                 if let Some(home_data) = &state.home_overview {
                     <div class="space-y-8">
@@ -245,9 +245,8 @@ pub fn home() -> Html {
                                         <div class="space-y-4">
                                             { for home_data.in_progress_episodes.iter().take(3).map(|episode| {
                                                 html! {
-                                                    <HomeEpisodeItem
-                                                        episode={episode.clone()}
-                                                        page_type="home"
+                                                    <EpisodeListItem
+                                                        episode={ episode.clone() }
                                                     />
                                                 }
                                             })}
@@ -274,7 +273,8 @@ pub fn home() -> Html {
                                     server_name_clone.unwrap_or_default(),
                                     api_key_clone,
                                     &history_clone,
-                                    podcast.podcastindexid.unwrap_or_default(),
+                                    podcast.podcastid,
+                                    podcast.podcastindexid,
                                     podcast.podcastname.clone(),
                                     podcast.feedurl.clone().unwrap_or_default(),
                                     podcast.description.clone().unwrap_or_else(|| i18n_no_description_provided.clone()),
@@ -340,9 +340,8 @@ pub fn home() -> Html {
                                 <div class="space-y-4">
                                     { for home_data.recent_episodes.iter().take(5).map(|episode| {
                                         html! {
-                                            <HomeEpisodeItem
+                                            <EpisodeListItem
                                                 episode={episode.clone()}
-                                                page_type="home"
                                             />
                                         }
                                     })}
@@ -362,6 +361,7 @@ pub fn home() -> Html {
             // Audio Player
             if let Some(audio_props) = &audio_state.currently_playing {
                 <AudioPlayer
+                    episode={audio_props.episode.clone()}
                     src={audio_props.src.clone()}
                     title={audio_props.title.clone()}
                     description={audio_props.description.clone()}
@@ -379,183 +379,5 @@ pub fn home() -> Html {
         </div>
         <App_drawer />
         </>
-    }
-}
-
-#[derive(Properties, PartialEq, Clone)]
-pub struct HomeEpisodeItemProps {
-    pub episode: HomeEpisode,
-    pub page_type: String,
-}
-
-#[function_component(HomeEpisodeItem)]
-pub fn home_episode_item(props: &HomeEpisodeItemProps) -> Html {
-    let (state, dispatch) = use_store::<AppState>();
-    let (audio_state, audio_dispatch) = use_store::<UIState>();
-    let api_key = state.auth_details.as_ref().map(|ud| ud.api_key.clone());
-    let user_id = state.user_details.as_ref().map(|ud| ud.UserID.clone());
-    let server_name = state.auth_details.as_ref().map(|ud| ud.server_name.clone());
-    let history = BrowserHistory::new();
-    let should_show_buttons = !props.episode.episodeurl.is_empty();
-    let episode: Box<dyn EpisodeTrait> = Box::new(props.episode.clone());
-    let listen_duration = props.episode.listenduration.unwrap_or(0);
-    let total_duration = props.episode.episodeduration;
-
-    let completed = props.episode.completed
-        || state
-            .completed_episodes
-            .as_ref()
-            .unwrap_or(&vec![])
-            .contains(&props.episode.episodeid);
-
-    let progress_percentage = if total_duration > 0 {
-        ((listen_duration as f64 / total_duration as f64) * 100.0).min(100.0)
-    } else {
-        0.0
-    };
-
-    // Format durations for display
-    let formatted_duration = format_time(total_duration as f64);
-    let duration_clone = formatted_duration.clone();
-    let duration_again = formatted_duration.clone();
-
-    // Format listen duration if it exists
-    let formatted_listen_duration = if listen_duration > 0 {
-        Some(format_time(listen_duration as f64))
-    } else {
-        None
-    };
-
-    let date_format = match_date_format(state.date_format.as_deref());
-    let datetime = parse_date(&props.episode.episodepubdate, &state.user_tz);
-    let formatted_date = format!(
-        "{}",
-        format_datetime(&datetime, &state.hour_preference, date_format)
-    );
-
-    let on_play_pause = on_play_pause(
-        props.episode.episodeurl.clone(),
-        props.episode.episodetitle.clone(),
-        props.episode.episodedescription.clone(),
-        formatted_date.clone(),
-        props.episode.episodeartwork.clone(),
-        props.episode.episodeduration,
-        props.episode.episodeid,
-        props.episode.listenduration,
-        api_key.unwrap().unwrap(),
-        user_id.unwrap(),
-        server_name.unwrap(),
-        audio_dispatch.clone(),
-        audio_state.clone(),
-        None,
-        Some(props.episode.is_youtube.clone()),
-    );
-
-    let on_shownotes_click = {
-        on_shownotes_click(
-            history.clone(),
-            dispatch.clone(),
-            Some(props.episode.episodeid),
-            Some(props.page_type.clone()),
-            Some(props.page_type.clone()),
-            Some(props.page_type.clone()),
-            true,
-            None,
-            Some(props.episode.is_youtube.clone()),
-        )
-    };
-
-    let is_current_episode = audio_state
-        .currently_playing
-        .as_ref()
-        .map_or(false, |current| {
-            current.episode_id == props.episode.episodeid
-        });
-
-    let is_playing = audio_state.audio_playing.unwrap_or(false);
-
-    html! {
-        <div class="item-container border-solid border flex items-start mb-4 shadow-md rounded-lg">
-            <div class="flex flex-col w-auto object-cover pl-4">
-                <FallbackImage
-                    src={props.episode.episodeartwork.clone()}
-                    alt={format!("Cover for {}", props.episode.episodetitle)}
-                    class="episode-image"
-                />
-            </div>
-            <div class="flex flex-col p-4 space-y-2 flex-grow md:w-7/12">
-                <div class="flex items-center space-x-2 cursor-pointer" onclick={on_shownotes_click.clone()}>
-                    <p class="item_container-text episode-title font-semibold line-clamp-2">
-                        { &props.episode.episodetitle }
-                    </p>
-                    {
-                        if completed.clone() {
-                            html! {
-                                <i class="ph ph-check-circle text-2xl text-green-500"></i>
-                            }
-                        } else {
-                            html! {}
-                        }
-                    }
-                </div>
-                <p class="item_container-text text-sm">{ &props.episode.podcastname }</p>
-                <div class="episode-time-badge-container" style="max-width: 100%; overflow: hidden;">
-                    <span
-                        class="episode-time-badge inline-flex items-center px-2.5 py-0.5 rounded me-2"
-                        style="flex-grow: 0; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
-                    >
-                        <svg class="time-icon w-2.5 h-2.5 me-1.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 0a10 10 0 1 0 10 10A10.011 10.011 0 0 0 10 0Zm3.982 13.982a1 1 0 0 1-1.414 0l-3.274-3.274A1.012 1.012 0 0 1 9 10V6a1 1 0 0 1 2 0v3.586l2.982 2.982a1 1 0 0 1 0 1.414Z"/>
-                        </svg>
-                        { formatted_date }
-                    </span>
-                </div>
-                {
-                    if completed {
-                        html! {
-                            <div class="flex items-center space-x-2">
-                                <span class="item_container-text">{ duration_clone }</span>
-                                <span class="item_container-text">{ "-  Completed" }</span>
-                            </div>
-                        }
-                    } else {
-                        if formatted_listen_duration.is_some() {
-                            html! {
-                                <div class="flex items-center space-x-2">
-                                    <span class="item_container-text">{ formatted_listen_duration.clone() }</span>
-                                    <div class="progress-bar-container">
-                                        <div class="progress-bar" style={ format!("width: {}%;", progress_percentage) }></div>
-                                    </div>
-                                    <span class="item_container-text">{ duration_again }</span>
-                                </div>
-                            }
-                        } else {
-                            html! {
-                                <span class="item_container-text">{ format!("{}", formatted_duration) }</span>
-                            }
-                        }
-                    }
-                }
-            </div>
-            <div class="flex flex-col items-center h-full w-2/12 px-2 space-y-4 md:space-y-8 button-container" style="align-self: center;">
-                if should_show_buttons {
-                    <button
-                        class="item-container-button selector-button font-bold py-2 px-4 rounded-full flex items-center justify-center md:w-16 md:h-16 w-10 h-10"
-                        onclick={on_play_pause}
-                    >
-                        {
-                            if is_current_episode && is_playing {
-                                html! { <i class="ph ph-pause-circle md:text-6xl text-4xl"></i> }
-                            } else {
-                                html! { <i class="ph ph-play-circle md:text-6xl text-4xl"></i> }
-                            }
-                        }
-                    </button>
-                    <div class="hidden sm:block"> // This will hide the context button below 640px
-                        <ContextButton episode={episode.clone()} page_type={"home".to_string()} />
-                    </div>
-                }
-            </div>
-        </div>
     }
 }
